@@ -1,6 +1,6 @@
 {
   "name": "@orchid-labs/pluxx",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Build AI agent plugins once. Prime-time on Claude Code, Cursor, Codex, and OpenCode, with beta generators for additional hosts.",
   "type": "module",
   "main": "dist/index.js",
