@@ -888,7 +888,7 @@ export const CORE_FOUR_PRIMITIVE_CAPABILITIES: Record<CoreFourPlatform, CoreFour
       hooks: {
         mode: 'translate',
         nativeSurfaces: ['hooks/hooks.json', '.codex/hooks.json', '~/.codex/hooks.json'],
-      notes: 'Hooks are native. Pluxx bundles translated Codex hooks in the plugin and still tracks the project/user config paths plus the mixed `[features].hooks` / `[features].codex_hooks` activation caveat and current runtime/doc drift.',
+        notes: 'Hooks are native. Pluxx bundles translated Codex hooks in the plugin with the documented `[features].plugin_hooks = true` plugin gate, and still tracks the broader project/user hook config paths where `[features].hooks` is the general flag and `codex_hooks` is deprecated.',
       },
       permissions: {
         mode: 'translate',

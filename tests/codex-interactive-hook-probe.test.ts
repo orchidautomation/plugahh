@@ -157,7 +157,7 @@ async function runScenario(scenario: CodexInteractiveHookProbeScenario, mode: st
 }
 
 describe('codex interactive hook probe', () => {
-  it('covers the documented trusted interactive prompt and session-start scenarios under both feature-flag spellings', async () => {
+  it('covers the documented trusted interactive prompt and session-start scenarios under both general hook feature-flag spellings', async () => {
     const rootDir = makeTempDir('pluxx-codex-interactive-hook-defaults-')
     const authHome = makeAuthHome(rootDir)
     const scriptBinary = makeFakeScript(rootDir)
