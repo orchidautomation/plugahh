@@ -1714,7 +1714,7 @@ describe('lintProject', () => {
     expect(result.issues.some(issue => issue.code === 'codex-hooks-external-config')).toBe(true)
   })
 
-  it('does not warn for supported Codex canonical hook aliases when the current feature flag is enabled', async () => {
+  it('does not warn for supported Codex canonical hook aliases when the plugin-bundled feature flag is enabled', async () => {
     const projectDir = createTempProject()
     mkdirSync(resolve(projectDir, 'skills/my-skill'), { recursive: true })
 
@@ -1733,7 +1733,7 @@ describe('lintProject', () => {
         },
         platforms: {
           codex: {
-            features: { hooks: true },
+            features: { plugin_hooks: true },
           },
         },
       }, null, 2),

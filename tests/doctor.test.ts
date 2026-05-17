@@ -856,7 +856,7 @@ describe('doctorConsumer', () => {
     }
   })
 
-  it('reports success when a project Codex config enables hooks for a hook-bearing install', async () => {
+  it('reports success when a project Codex config enables plugin-bundled hooks for a hook-bearing install', async () => {
     const dir = createCodexHookConsumerFixture()
     const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
     const originalHome = process.env.HOME
@@ -892,7 +892,7 @@ describe('doctorConsumer', () => {
     }
   })
 
-  it('reports success when a user Codex config enables hooks for a hook-bearing install', async () => {
+  it('reports success when a user Codex config enables plugin-bundled hooks for a hook-bearing install', async () => {
     const dir = createCodexHookConsumerFixture()
     const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
     const originalHome = process.env.HOME
@@ -903,7 +903,7 @@ describe('doctorConsumer', () => {
     mkdirSync(resolve(homeDir, '.codex'), { recursive: true })
     writeFileSync(
       resolve(homeDir, '.codex/config.toml'),
-      `[features]\nhooks = true\n\n[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,
+      `[features]\nplugin_hooks = true\n\n[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,
     )
 
     try {
