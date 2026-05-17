@@ -391,8 +391,8 @@ Open work:
 - [x] Validate the current self-hosting flow end to end
 - [x] Run tests, release smoke, and the packaged-runtime release gate before the next cut
 - [x] Restore example parity for `examples/prospeo-mcp` so release smoke and the real package agree again
-- [x] Publish and verify `@orchid-labs/pluxx@0.1.18`
-- [ ] For the next cut, bump `package.json` from `0.1.18` to the next version
+- [x] Publish and verify `@orchid-labs/pluxx@0.1.20`
+- [ ] For the next cut, bump `package.json` from `0.1.20` to the next version
 - [ ] Rerun `npm run release:check` before tagging
 - [ ] Commit and push release-prep fixes to `main`
 - [ ] Push the matching `vX.Y.Z` tag so the GitHub Actions release workflow publishes to npm

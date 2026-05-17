@@ -195,7 +195,7 @@ The closure plan is now narrower than it was before:
 - the release gate is green again as of 2026-05-17:
   - `npm test` passed
   - `npm run release:check` passed
-- the latest published npm package is `@orchid-labs/pluxx@0.1.18`
+- the latest published npm package is `@orchid-labs/pluxx@0.1.20`
 - OpenClaw should stay in scope only as a beta-target lane until a native generator, validator/doctor path, and behavioral smoke proof exist:
   - [docs/openclaw-target-evaluation.md](./openclaw-target-evaluation.md)
 
@@ -344,11 +344,11 @@ This is for learning and proof, not for prematurely building the full trust laye
 
 ### 6. Next release
 
-The current public npm cut is `0.1.18`.
+The current public npm cut is `0.1.20`.
 
 The next npm cut should stay primarily an operations step rather than a code-confidence rescue step.
 
-- start from `0.1.18`
+- start from `0.1.20`
 - rerun `npm run release:check`
 - bump `package.json` and `package-lock.json` to the next version
 - commit and push release-prep fixes and source-of-truth updates

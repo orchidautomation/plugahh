@@ -183,7 +183,7 @@ curl -fsSL https://raw.githubusercontent.com/orchidautomation/pluxx/main/example
 
 Current release note:
 
-- the latest published npm package is `@orchid-labs/pluxx@0.1.18`
+- the latest published npm package is `@orchid-labs/pluxx@0.1.20`
 - the published npm package now includes the Claude plugin-agent manifest fix
 - the public `pluxx test --install --trust --behavioral` path now matches the repo-local Exa proof state
 

@@ -309,7 +309,7 @@ The repo already proves a lot.
 - the current release gate is green again as of 2026-05-17:
   - `npm test` passed
   - `npm run release:check` passed
-- the latest published npm package is `@orchid-labs/pluxx@0.1.18`
+- the latest published npm package is `@orchid-labs/pluxx@0.1.20`
 - OpenCode-native agent output is now permission-first:
   - legacy agent `tools` input is translated forward where possible
   - native OpenCode `skill` and `task` permission keys are treated as real first-class surfaces
@@ -475,14 +475,14 @@ Run two lanes in parallel:
 
 ### 6. Release State
 
-The current public release is `0.1.18`.
+The current public release is `0.1.20`.
 
 The release checklist for the current cut is complete:
 
-- `package.json` and `package-lock.json` are at `0.1.18`
-- local `main` is tagged `v0.1.18`
-- npm reports `@orchid-labs/pluxx@0.1.18` as latest
-- the release gate has been rerun locally, including package runtime verification and dry-run pack
+- `package.json` and `package-lock.json` are at `0.1.20`
+- local `main` is tagged `v0.1.20`
+- npm reports `@orchid-labs/pluxx@0.1.20` as latest
+- the GitHub release workflow reran the release gate, including package runtime verification and release tarball pack
 
 For the next release, start from the current version, rerun `npm run release:check`, bump the package version, push `main`, push the matching `vX.Y.Z` tag, and verify npm plus GitHub release artifacts after the workflow completes.
 
