@@ -19,6 +19,8 @@ import {
 } from '../runtime-readiness-registry'
 import {
   ALTERNATE_CODEX_HOOKS_FEATURE_FLAG,
+  PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG,
+  isCodexPluginHooksFeatureEnabled,
   isCodexHooksFeatureEnabled,
   RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG,
   usesAlternateCodexHooksFeatureFlagOnly,
@@ -1204,13 +1206,13 @@ function lintCodexHooksExternalConfig(config: PluginConfig, issues: LintIssue[])
 
   const codexOverrides = asRecord(config.platforms?.codex)
   const features = codexOverrides ? asRecord(codexOverrides.features) : null
-  const hasPluxxCodexHooksFlag = isCodexHooksFeatureEnabled(features)
+  const hasPluxxCodexPluginHooksFlag = isCodexPluginHooksFeatureEnabled(features)
 
-  if (!hasPluxxCodexHooksFlag) {
+  if (!hasPluxxCodexPluginHooksFlag) {
     pushIssue(issues, {
       level: 'warning',
       code: 'codex-hooks-external-config',
-      message: `Pluxx now bundles Codex hooks at \`hooks/hooks.json\`, but Codex hook loading may still be guarded by a \`[features]\` flag in the host runtime. Current Codex config surfaces still accept both \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG} = true\` and \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG} = true\`; maintained probes on May 13, 2026 showed local Codex CLI 0.130.0 still failing to execute the project-local hook under either config flag and under the current CLI feature path \`--enable hooks\`, while \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` emitted a deprecation warning that points users to \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG}\`. If bundled hooks do not activate, enable \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG} = true\` first, reload Codex, and retest in a trusted interactive session, but do not treat the flag by itself as proof that hooks will execute.`,
+      message: `Pluxx now bundles Codex hooks at \`hooks/hooks.json\`, and Codex plugin-bundled hook loading requires \`${PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG} = true\` under \`[features]\`. The general \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG}\` flag covers non-plugin hook config and defaults on; \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` is deprecated and should not be treated as a plugin-bundled hook fallback. If bundled hooks do not activate, enable \`${PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG} = true\`, reload Codex, and retest in a trusted interactive session.`,
       file: 'pluxx.config.ts',
       platform: 'Codex',
     })
@@ -1220,7 +1222,17 @@ function lintCodexHooksExternalConfig(config: PluginConfig, issues: LintIssue[])
     pushIssue(issues, {
       level: 'warning',
       code: 'codex-hooks-legacy-feature-flag',
-      message: `Current local Codex CLI 0.130.0 interactive probes on May 13, 2026 emitted a deprecation warning for \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` that points users to \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG}\`. Keep \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` only as a compatibility fallback and prefer \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG} = true\`.`,
+      message: `\`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` is deprecated for general Codex hook config and should not be treated as a plugin-bundled hook fallback. Keep it only as a compatibility fallback for non-plugin hook wiring, prefer \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG} = true\` there, and use \`${PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG} = true\` for plugin-bundled hooks.`,
+      file: 'pluxx.config.ts',
+      platform: 'Codex',
+    })
+  }
+
+  if (!hasPluxxCodexPluginHooksFlag && isCodexHooksFeatureEnabled(features)) {
+    pushIssue(issues, {
+      level: 'warning',
+      code: 'codex-hooks-general-feature-flag-only',
+      message: `This Codex config enables only general hook flags. Plugin-bundled hooks at \`hooks/hooks.json\` still need \`${PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG} = true\` under \`[features]\`; \`${RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG}\` and \`${ALTERNATE_CODEX_HOOKS_FEATURE_FLAG}\` alone are not sufficient.`,
       file: 'pluxx.config.ts',
       platform: 'Codex',
     })

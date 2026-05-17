@@ -1750,7 +1750,7 @@ describe('lintProject', () => {
     expect(result.issues.some(issue => issue.code === 'codex-hook-event-unsupported')).toBe(false)
   })
 
-  it('accepts codex_hooks as a valid Codex hook feature flag', async () => {
+  it('warns that general Codex hook flags do not enable plugin-bundled hooks by themselves', async () => {
     const projectDir = createTempProject()
     mkdirSync(resolve(projectDir, 'skills/my-skill'), { recursive: true })
 
@@ -1780,8 +1780,44 @@ describe('lintProject', () => {
     )
 
     const result = await lintProject(projectDir)
-    expect(result.issues.some(issue => issue.code === 'codex-hooks-external-config')).toBe(false)
+    expect(result.issues.some(issue => issue.code === 'codex-hooks-external-config')).toBe(true)
     expect(result.issues.some(issue => issue.code === 'codex-hooks-legacy-feature-flag')).toBe(true)
+    expect(result.issues.some(issue => issue.code === 'codex-hooks-general-feature-flag-only')).toBe(true)
+  })
+
+  it('accepts plugin_hooks as the plugin-bundled Codex hook feature flag', async () => {
+    const projectDir = createTempProject()
+    mkdirSync(resolve(projectDir, 'skills/my-skill'), { recursive: true })
+
+    writeFileSync(
+      resolve(projectDir, 'pluxx.config.json'),
+      JSON.stringify({
+        name: 'test-plugin',
+        version: '0.1.0',
+        description: 'test',
+        author: { name: 'Test Author' },
+        skills: './skills/',
+        targets: ['codex'],
+        hooks: {
+          sessionStart: [{ command: 'echo start' }],
+        },
+        platforms: {
+          codex: {
+            features: { plugin_hooks: true },
+          },
+        },
+      }, null, 2),
+    )
+
+    writeFileSync(
+      resolve(projectDir, 'skills/my-skill/SKILL.md'),
+      ['---', 'name: my-skill', 'description: "A skill"', '---', '', '# Skill'].join('\n'),
+    )
+
+    const result = await lintProject(projectDir)
+    expect(result.issues.some(issue => issue.code === 'codex-hooks-external-config')).toBe(false)
+    expect(result.issues.some(issue => issue.code === 'codex-hooks-legacy-feature-flag')).toBe(false)
+    expect(result.issues.some(issue => issue.code === 'codex-hooks-general-feature-flag-only')).toBe(false)
   })
 
   it('warns when runtime readiness depends on external Codex wiring or best-effort prompt scoping', async () => {

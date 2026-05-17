@@ -179,7 +179,7 @@ Any person or agent should be able to enter the repo and answer:
   - Codex now bundles translated hooks at `hooks/hooks.json` and keeps `.codex/readiness.generated.json` plus `.codex/hooks.generated.json` companions for explanation/debugging
   - generated Codex hooks now use the official nested matcher-group schema instead of the older flat entry shape
   - `lint` and `doctor` now explain the remaining Codex feature-gate and best-effort prompt-entry degradation for named skill/command readiness targets
-  - `doctor --consumer` and `verify-install` now also warn when a hook-bearing installed Codex bundle is missing both `[features] hooks = true` and `[features] codex_hooks = true` in the checked project/user config layers; the current recommendation is to try `hooks = true` first, and `codex_hooks`-only use is now treated as a legacy compatibility warning
+  - `doctor --consumer` and `verify-install` now also warn when a hook-bearing installed Codex plugin bundle is missing `[features] plugin_hooks = true` in the checked project or user config layers; `hooks` remains the general non-plugin hook flag and defaults on, while `codex_hooks` is deprecated and no longer treated as a plugin-bundled hook fallback
   - `doctor --consumer` and `verify-install` now also warn when the checked project is not trusted in the user Codex config for project-local hook loading
   - `verify-install` now prints the concrete installed-bundle Codex warning code, explanation, and fix inline instead of only surfacing a warning count
   - `bun scripts/probe-codex-hooks-runtime.ts --json` now gives maintained isolated headless evidence that `hooks-no-trust`, `hooks-trusted`, and `codex-hooks-trusted` all return `OK` without firing the hook side effect

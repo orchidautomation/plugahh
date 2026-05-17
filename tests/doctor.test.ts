@@ -866,7 +866,7 @@ describe('doctorConsumer', () => {
     delete process.env.CODEX_HOME
     mkdirSync(resolve(projectRoot, '.codex'), { recursive: true })
     mkdirSync(resolve(homeDir, '.codex'), { recursive: true })
-    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nhooks = true\n')
+    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
     writeFileSync(
       resolve(homeDir, '.codex/config.toml'),
       `[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,
@@ -935,12 +935,13 @@ describe('doctorConsumer', () => {
     process.env.HOME = homeDir
     delete process.env.CODEX_HOME
     mkdirSync(resolve(projectRoot, '.codex'), { recursive: true })
-    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nhooks = true\n')
+    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
 
     try {
       const report = await doctorConsumer(dir, { projectRoot })
       expect(report.ok).toBe(true)
       expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-enabled' && check.level === 'success')).toBe(true)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-plugin-hooks-feature-flag-general-only')).toBe(false)
       expect(report.checks.some((check) => check.code === 'consumer-codex-project-trust-enabled')).toBe(false)
       expect(report.checks.some((check) => check.code === 'consumer-codex-project-trust-missing' && check.level === 'warning')).toBe(true)
     } finally {
@@ -956,7 +957,7 @@ describe('doctorConsumer', () => {
     }
   })
 
-  it('reports success when a hook-bearing Codex install finds codex_hooks in the checked config layers', async () => {
+  it('reports success when a hook-bearing Codex install finds plugin_hooks in the checked config layers', async () => {
     const dir = createCodexHookConsumerFixture()
     const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
     const originalHome = process.env.HOME
@@ -966,7 +967,7 @@ describe('doctorConsumer', () => {
     delete process.env.CODEX_HOME
     mkdirSync(resolve(projectRoot, '.codex'), { recursive: true })
     mkdirSync(resolve(homeDir, '.codex'), { recursive: true })
-    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\ncodex_hooks = true\n')
+    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
     writeFileSync(
       resolve(homeDir, '.codex/config.toml'),
       `[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,
@@ -976,7 +977,8 @@ describe('doctorConsumer', () => {
       const report = await doctorConsumer(dir, { projectRoot })
       expect(report.ok).toBe(true)
       expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-enabled' && check.level === 'success')).toBe(true)
-      expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-legacy-only' && check.level === 'warning')).toBe(true)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-legacy-only')).toBe(false)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-plugin-hooks-feature-flag-general-only')).toBe(false)
       expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-missing')).toBe(false)
       expect(report.checks.some((check) => check.code === 'consumer-codex-project-trust-enabled' && check.level === 'success')).toBe(true)
       expect(report.checks.some((check) => check.code === 'consumer-codex-project-trust-missing')).toBe(false)
@@ -1068,6 +1070,41 @@ describe('doctorConsumer', () => {
       expect(report.checks.some((check) => check.detail.includes('manifest references missing path: ./.app.json'))).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('warns when a hook-bearing Codex install finds only general hook flags in the checked config layers', async () => {
+    const dir = createCodexHookConsumerFixture()
+    const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
+    const originalHome = process.env.HOME
+    const originalCodexHome = process.env.CODEX_HOME
+    const homeDir = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-home-'))
+    process.env.HOME = homeDir
+    delete process.env.CODEX_HOME
+    mkdirSync(resolve(projectRoot, '.codex'), { recursive: true })
+    mkdirSync(resolve(homeDir, '.codex'), { recursive: true })
+    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nhooks = true\n')
+    writeFileSync(
+      resolve(homeDir, '.codex/config.toml'),
+      `[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,
+    )
+
+    try {
+      const report = await doctorConsumer(dir, { projectRoot })
+      expect(report.ok).toBe(true)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-plugin-hooks-feature-flag-general-only' && check.level === 'warning')).toBe(true)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-enabled')).toBe(false)
+      expect(report.checks.some((check) => check.code === 'consumer-codex-hooks-feature-flag-missing' && check.level === 'warning')).toBe(true)
+    } finally {
+      process.env.HOME = originalHome
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME
+      } else {
+        process.env.CODEX_HOME = originalCodexHome
+      }
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(projectRoot, { recursive: true, force: true })
+      rmSync(homeDir, { recursive: true, force: true })
     }
   })
 

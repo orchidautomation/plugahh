@@ -818,7 +818,7 @@ describe('verifyInstall', () => {
     expect(result.checks[0].errors).toBeGreaterThan(0)
   })
 
-  it('passes with a warning for an installed codex bundle with plugin-bundled hooks when hooks is not enabled', async () => {
+  it('passes with a warning for an installed codex bundle with plugin-bundled hooks when plugin_hooks is not enabled', async () => {
     mkdirSync(resolve(DIST_DIR, 'codex/.codex-plugin'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/skills/hello'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/hooks'), { recursive: true })
@@ -871,7 +871,7 @@ describe('verifyInstall', () => {
     expect(result.checks[0].warnings).toBeGreaterThan(0)
   })
 
-  it('passes with a warning for an installed codex bundle with plugin-bundled hooks when hooks is enabled but the project is not trusted', async () => {
+  it('passes with a warning for an installed codex bundle with plugin-bundled hooks when only hooks is enabled but the project is not trusted', async () => {
     mkdirSync(resolve(DIST_DIR, 'codex/.codex-plugin'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/skills/hello'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/hooks'), { recursive: true })
@@ -928,6 +928,10 @@ describe('verifyInstall', () => {
       expect.arrayContaining([
         expect.objectContaining({
           level: 'warning',
+          code: 'consumer-codex-plugin-hooks-feature-flag-general-only',
+        }),
+        expect.objectContaining({
+          level: 'warning',
           code: 'consumer-codex-project-trust-missing',
           title: 'Codex project trust may still block hook activation',
         }),
@@ -935,14 +939,14 @@ describe('verifyInstall', () => {
     )
   })
 
-  it('passes cleanly for an installed codex bundle with plugin-bundled hooks when the project enables hooks and the user trusts the project', async () => {
+  it('passes cleanly for an installed codex bundle with plugin-bundled hooks when the project enables plugin_hooks and the user trusts the project', async () => {
     mkdirSync(resolve(DIST_DIR, 'codex/.codex-plugin'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/skills/hello'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/hooks'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/scripts'), { recursive: true })
     mkdirSync(resolve(ROOT, '.codex'), { recursive: true })
     mkdirSync(resolve(HOME_DIR, '.codex'), { recursive: true })
-    writeFileSync(resolve(ROOT, '.codex/config.toml'), '[features]\nhooks = true\n')
+    writeFileSync(resolve(ROOT, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
     writeFileSync(
       resolve(HOME_DIR, '.codex/config.toml'),
       `[projects.${JSON.stringify(resolve(ROOT))}]\ntrust_level = "trusted"\n`,
@@ -1048,6 +1052,18 @@ describe('verifyInstall', () => {
       errors: 0,
     })
     expect(result.checks[0].warnings).toBeGreaterThan(0)
+    expect(result.checks[0].issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          level: 'warning',
+          code: 'consumer-codex-hooks-feature-flag-legacy-only',
+        }),
+        expect.objectContaining({
+          level: 'warning',
+          code: 'consumer-codex-plugin-hooks-feature-flag-general-only',
+        }),
+      ]),
+    )
   })
 
   it('passes for an installed codex bundle with a referenced .app.json surface', async () => {

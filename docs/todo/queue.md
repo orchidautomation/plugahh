@@ -141,7 +141,7 @@ The initial author-once hardening tranche is also materially done.
   - managed Claude settings proof is intentionally bounded here: the opt-in managed-shadow `SessionStart` scenarios run through a synthetic managed-settings path in the probe/test harness, so live registry/plist/MDM/server-managed precedence proof is still outside the current environment
   - malformed bundled Codex `hooks/hooks.json` now fails `doctor --consumer` and `verify-install` instead of passing on file presence alone
   - missing Codex `.app.json` surfaces referenced by the manifest now also fail `doctor --consumer` and `verify-install`
-  - hook-bearing Codex installs now warn when neither the checked project nor user Codex config enables `[features] hooks = true` or `[features] codex_hooks = true`; missing-flag guidance now recommends `hooks = true` first, and `codex_hooks`-only use is now treated as a legacy compatibility warning
+  - hook-bearing Codex plugin installs now warn when the checked project and user Codex config both omit `[features] plugin_hooks = true`; `hooks` remains the general non-plugin hook flag and defaults on, while `codex_hooks` is deprecated and no longer presented as a plugin-bundled hook fallback
   - hook-bearing Codex installs now also warn when the checked project is not trusted in the user Codex config for project-local hook loading
   - `verify-install` now prints the concrete installed-bundle Codex warning code, explanation, and fix inline instead of only surfacing a warning count
   - generated Codex hooks now use the official nested matcher-group schema instead of the older flat entry shape

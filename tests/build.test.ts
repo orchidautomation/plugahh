@@ -1008,8 +1008,9 @@ describe('build', () => {
     expect(codexManifest.hooks).toBe('./hooks/hooks.json')
     expect(codexBundledHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.type).toBe('command')
     expect(codexBundledHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.command).toBe('bash ./hooks/pluxx-hook-command-1.sh')
-    expect(codexHooks.featureFlag).toBe('hooks')
-    expect(codexHooks.alternateFeatureFlag).toBe('codex_hooks')
+    expect(codexHooks.pluginBundleFeatureFlag).toBe('plugin_hooks')
+    expect(codexHooks.generalFeatureFlag).toBe('hooks')
+    expect(codexHooks.deprecatedGeneralFeatureFlag).toBe('codex_hooks')
     expect(codexHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.command).toBe('bash ./hooks/pluxx-hook-command-1.sh')
     expect(readFileSync(resolve(OUT_DIR, 'codex/hooks/pluxx-hook-command-1.sh'), 'utf-8')).toContain('./scripts/validate.sh')
     expect(codexCommands.commands[0]?.id).toBe('pulse')
@@ -1285,8 +1286,9 @@ describe('build', () => {
     expect(codexBundledHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.command).toBe('node ./.codex/pluxx-readiness.mjs session-start')
     expect(codexBundledHooks.hooks.PreToolUse?.[0]?.matcher).toBe('MCP')
     expect(codexBundledHooks.hooks.PreToolUse?.[0]?.hooks?.[0]?.command).toBe('node ./.codex/pluxx-readiness.mjs mcp-gate')
-    expect(codexHooks.featureFlag).toBe('hooks')
-    expect(codexHooks.alternateFeatureFlag).toBe('codex_hooks')
+    expect(codexHooks.pluginBundleFeatureFlag).toBe('plugin_hooks')
+    expect(codexHooks.generalFeatureFlag).toBe('hooks')
+    expect(codexHooks.deprecatedGeneralFeatureFlag).toBe('codex_hooks')
     expect(codexHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.command).toBe('node ./.codex/pluxx-readiness.mjs session-start')
     expect(codexHooks.hooks.PreToolUse?.[0]?.matcher).toBe('MCP')
     expect(codexHooks.hooks.PreToolUse?.[0]?.hooks?.[0]?.command).toBe('node ./.codex/pluxx-readiness.mjs mcp-gate')
@@ -1311,8 +1313,9 @@ describe('build', () => {
       readFileSync(resolve(OUT_DIR, 'codex/.codex/hooks.generated.json'), 'utf-8')
     ) as {
       model: string
-      featureFlag: string
-      alternateFeatureFlag: string
+      pluginBundleFeatureFlag: string
+      generalFeatureFlag: string
+      deprecatedGeneralFeatureFlag: string
       hooks: Record<string, CodexHookMatcherGroup[]>
     }
 
@@ -1325,8 +1328,9 @@ describe('build', () => {
       command: 'bash ./hooks/pluxx-hook-command-2.sh',
     })
     expect(codexHooks.model).toBe('pluxx.codex-hooks.v1')
-    expect(codexHooks.featureFlag).toBe('hooks')
-    expect(codexHooks.alternateFeatureFlag).toBe('codex_hooks')
+    expect(codexHooks.pluginBundleFeatureFlag).toBe('plugin_hooks')
+    expect(codexHooks.generalFeatureFlag).toBe('hooks')
+    expect(codexHooks.deprecatedGeneralFeatureFlag).toBe('codex_hooks')
     expect(codexHooks.hooks.SessionStart?.[0]?.hooks?.[0]?.command).toBe('bash ./hooks/pluxx-hook-command-1.sh')
     expect(codexHooks.hooks.UserPromptSubmit?.[0]?.hooks?.[0]?.command).toBe('bash ./hooks/pluxx-hook-command-2.sh')
     expect(readFileSync(resolve(OUT_DIR, 'codex/hooks/pluxx-hook-command-1.sh'), 'utf-8')).toContain('./scripts/validate.sh')

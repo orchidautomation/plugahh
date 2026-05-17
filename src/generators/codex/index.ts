@@ -16,6 +16,7 @@ import {
 } from '../../runtime-readiness-registry'
 import {
   ALTERNATE_CODEX_HOOKS_FEATURE_FLAG,
+  PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG,
   RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG,
 } from '../../codex-hooks-feature'
 import { getCanonicalAgentMetadata, readCanonicalAgentFiles } from '../../agents'
@@ -374,9 +375,10 @@ export class CodexGenerator extends Generator {
     await this.writeJson('.codex/hooks.generated.json', {
       model: 'pluxx.codex-hooks.v1',
       enforcedByPluginBundle: true,
-      featureFlag: RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG,
-      alternateFeatureFlag: ALTERNATE_CODEX_HOOKS_FEATURE_FLAG,
-      note: 'Codex hook configuration is bundled at hooks/hooks.json in the plugin. This companion mirror preserves the translated native event names, matcher groups, and command handlers while highlighting any dropped events or fields. Current Codex config surfaces still accept both hooks and codex_hooks under [features], but maintained interactive probes on May 13, 2026 showed local Codex CLI 0.130.0 timing out without a project-local hook side effect under either flag while emitting a deprecation warning for codex_hooks that points users to hooks.',
+      pluginBundleFeatureFlag: PLUGIN_BUNDLED_CODEX_HOOKS_FEATURE_FLAG,
+      generalFeatureFlag: RECOMMENDED_CODEX_HOOKS_FEATURE_FLAG,
+      deprecatedGeneralFeatureFlag: ALTERNATE_CODEX_HOOKS_FEATURE_FLAG,
+      note: 'Codex plugin-bundled hook configuration is bundled at hooks/hooks.json in the plugin and currently requires `[features].plugin_hooks = true`. The general `[features].hooks` flag covers non-plugin hook config and defaults on, while `codex_hooks` is deprecated and should not be treated as a plugin-bundled hook fallback. This companion mirror preserves the translated native event names, matcher groups, and command handlers while highlighting any dropped events or fields.',
       hooks,
       ...(unsupported.length > 0 ? { unsupported } : {}),
     })

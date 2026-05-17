@@ -448,7 +448,7 @@ export const PLATFORM_VALIDATION_RULES: Record<ResearchTarget, PlatformRules> = 
       supported: true,
       files: ['hooks/hooks.json', '.codex/hooks.json', '~/.codex/hooks.json'],
       eventNames: ['SessionStart', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'UserPromptSubmit', 'Stop'],
-      notes: 'Codex documents hooks in project and user config, and the current config schema still accepts both `[features].hooks = true` and `[features].codex_hooks = true`. Maintained interactive probes on May 13, 2026 showed local Codex CLI 0.130.0 timing out without a project-local `.codex/hooks.json` side effect or `/hooks` review gate under either flag; the `codex_hooks` variant also emitted a deprecation message that points users to `hooks`, while the official docs still show `codex_hooks`. The official hooks docs also cover plugin-bundled hooks, which Pluxx now emits at `hooks/hooks.json`.',
+      notes: 'Codex documents both project or user hook config and plugin-bundled hooks. Plugin-bundled hooks live at `hooks/hooks.json` in the plugin and require `[features].plugin_hooks = true`; the general `[features].hooks = true` flag covers non-plugin hook config and defaults on. `codex_hooks` is deprecated and should not be treated as a plugin-bundled hook fallback.',
     },
     instructions: {
       files: ['AGENTS.md', 'AGENTS.override.md'],
