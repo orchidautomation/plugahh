@@ -482,7 +482,7 @@ function renderInstallerUserConfigSnippet(config: PluginConfig, platform: Target
 
   const promptLines = entries.map((entry) => {
     const functionName = entry.type === 'secret' ? 'pluxx_prompt_secret_config' : 'pluxx_prompt_text_config'
-    return `${functionName} ${JSON.stringify(entry.envVar)} ${JSON.stringify(entry.title)} ${entry.required ? '1' : '0'}`
+    return `${functionName} ${JSON.stringify(entry.key)} ${JSON.stringify(entry.envVar)} ${JSON.stringify(entry.title)} ${entry.required ? '1' : '0'}`
   })
 
   return `
@@ -490,10 +490,11 @@ PLUXX_USER_CONFIG_SPEC="$(cat <<'PLUXX_USER_CONFIG_JSON'
 ${JSON.stringify(entries)}
 PLUXX_USER_CONFIG_JSON
 )"
+PLUXX_REUSED_USER_CONFIG=0
 
 pluxx_is_placeholder_secret() {
   case "$1" in
-    *dummy*|*Dummy*|*DUMMY*|*placeholder*|*Placeholder*|*PLACEHOLDER*|*changeme*|*CHANGE_ME*|*replace*me*|*Replace*Me*|*your*key*|*YOUR*KEY*|*api*key*here*|*API*KEY*HERE*|*token*here*|*TOKEN*HERE*)
+    *dummy*|*Dummy*|*DUMMY*|*placeholder*|*Placeholder*|*PLACEHOLDER*|*example*|*Example*|*EXAMPLE*|*changeme*|*CHANGE_ME*|*replace*me*|*Replace*Me*|*your*key*|*YOUR*KEY*|*api*key*here*|*API*KEY*HERE*|*token*here*|*TOKEN*HERE*)
       return 0
       ;;
     *)
@@ -502,11 +503,60 @@ pluxx_is_placeholder_secret() {
   esac
 }
 
+pluxx_saved_config_value() {
+  local key="$1"
+  local env_var="$2"
+
+  if [[ -z "\${PLUXX_SAVED_USER_CONFIG_PATH:-}" || ! -f "$PLUXX_SAVED_USER_CONFIG_PATH" ]]; then
+    return 1
+  fi
+
+  PLUXX_SAVED_CONFIG_KEY="$key" PLUXX_SAVED_CONFIG_ENV_VAR="$env_var" node <<'NODE'
+const fs = require('fs')
+
+const filepath = process.env.PLUXX_SAVED_USER_CONFIG_PATH
+const key = process.env.PLUXX_SAVED_CONFIG_KEY
+const envVar = process.env.PLUXX_SAVED_CONFIG_ENV_VAR
+
+try {
+  const payload = JSON.parse(fs.readFileSync(filepath, 'utf8'))
+  const candidates = [
+    payload && payload.env && envVar ? payload.env[envVar] : undefined,
+    payload && payload.values && key ? payload.values[key] : undefined,
+  ]
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue
+    if (!['string', 'number', 'boolean'].includes(typeof candidate)) continue
+    const value = String(candidate)
+    if (value === '') continue
+    process.stdout.write(value)
+    process.exit(0)
+  }
+} catch {}
+
+process.exit(1)
+NODE
+}
+
 pluxx_prompt_secret_config() {
-  local env_var="$1"
-  local label="$2"
-  local required="$3"
+  local key="$1"
+  local env_var="$2"
+  local label="$3"
+  local required="$4"
   local current_value="\${!env_var:-}"
+
+  if [[ -z "$current_value" && "\${PLUXX_RECONFIGURE:-0}" != "1" ]]; then
+    local saved_value=""
+    if saved_value="$(pluxx_saved_config_value "$key" "$env_var")"; then
+      if pluxx_is_placeholder_secret "$saved_value"; then
+        echo "Ignoring placeholder-looking saved config for $env_var." >&2
+      else
+        current_value="$saved_value"
+        PLUXX_REUSED_USER_CONFIG=1
+      fi
+    fi
+  fi
 
   if [[ -z "$current_value" && "$required" == "1" ]]; then
     if [[ -t 0 || -r /dev/tty ]]; then
@@ -527,10 +577,19 @@ pluxx_prompt_secret_config() {
 }
 
 pluxx_prompt_text_config() {
-  local env_var="$1"
-  local label="$2"
-  local required="$3"
+  local key="$1"
+  local env_var="$2"
+  local label="$3"
+  local required="$4"
   local current_value="\${!env_var:-}"
+
+  if [[ -z "$current_value" && "\${PLUXX_RECONFIGURE:-0}" != "1" ]]; then
+    local saved_value=""
+    if saved_value="$(pluxx_saved_config_value "$key" "$env_var")"; then
+      current_value="$saved_value"
+      PLUXX_REUSED_USER_CONFIG=1
+    fi
+  fi
 
   if [[ -z "$current_value" && "$required" == "1" ]]; then
     if [[ -t 0 || -r /dev/tty ]]; then
@@ -545,6 +604,10 @@ pluxx_prompt_text_config() {
 }
 
 ${promptLines.join('\n')}
+
+if [[ "$PLUXX_REUSED_USER_CONFIG" == "1" ]]; then
+  echo "Found existing plugin config; reusing saved install values."
+fi
 
 export PLUXX_USER_CONFIG_SPEC
 export PLUXX_INSTALL_DIR="${installDirVariable}"
@@ -641,6 +704,19 @@ NODE
 
 function hasInstallerUserConfig(config: PluginConfig, platform: TargetPlatform): boolean {
   return collectUserConfigEntries(config, [platform]).length > 0
+}
+
+function renderInstallerSavedUserConfigCaptureSnippet(config: PluginConfig, platform: TargetPlatform, installDirVariable: string): string {
+  if (!hasInstallerUserConfig(config, platform)) return ''
+
+  return `
+PLUXX_SAVED_USER_CONFIG_PATH=""
+if [[ "\${PLUXX_RECONFIGURE:-0}" != "1" && -f "${installDirVariable}/.pluxx-user.json" ]]; then
+  PLUXX_SAVED_USER_CONFIG_PATH="$TMP_DIR/pluxx-saved-user-config.json"
+  cp "${installDirVariable}/.pluxx-user.json" "$PLUXX_SAVED_USER_CONFIG_PATH"
+fi
+export PLUXX_SAVED_USER_CONFIG_PATH
+`
 }
 
 function renderInstallerMcpPathMaterializationSnippet(platform: TargetPlatform, installDirVariable: string): string {
@@ -1017,6 +1093,7 @@ VERSION="$(grep -E '"version"' "$PLUGIN_MANIFEST" | head -n1 | sed -E 's/.*"vers
 DESCRIPTION="$(grep -E '"description"' "$PLUGIN_MANIFEST" | head -n1 | sed -E 's/.*"description"[[:space:]]*:[[:space:]]*"([^"]+)".*/\\1/')"
 
 mkdir -p "$INSTALL_ROOT/.claude-plugin" "$INSTALL_ROOT/plugins"
+${renderInstallerSavedUserConfigCaptureSnippet(config, 'claude-code', '$INSTALL_ROOT/plugins/$PLUGIN_NAME')}
 rm -rf "$INSTALL_ROOT/plugins/$PLUGIN_NAME"
 cp -R "$BUNDLE_DIR" "$INSTALL_ROOT/plugins/$PLUGIN_NAME"
 ${renderInstallerUserConfigSnippet(config, 'claude-code', '$INSTALL_ROOT/plugins/$PLUGIN_NAME')}
@@ -1113,6 +1190,7 @@ if [[ ! -f "$PLUGIN_MANIFEST" ]]; then
 fi
 
 mkdir -p "$(dirname "$INSTALL_DIR")"
+${renderInstallerSavedUserConfigCaptureSnippet(config, 'cursor', '$INSTALL_DIR')}
 rm -rf "$INSTALL_DIR"
 cp -R "$BUNDLE_DIR" "$INSTALL_DIR"
 ${renderInstallerUserConfigSnippet(config, 'cursor', '$INSTALL_DIR')}
@@ -1174,6 +1252,7 @@ if [[ ! -f "$PLUGIN_MANIFEST" ]]; then
 fi
 
 mkdir -p "$(dirname "$INSTALL_DIR")"
+${renderInstallerSavedUserConfigCaptureSnippet(config, 'codex', '$INSTALL_DIR')}
 rm -rf "$INSTALL_DIR"
 cp -R "$BUNDLE_DIR" "$INSTALL_DIR"
 ${renderInstallerUserConfigSnippet(config, 'codex', '$INSTALL_DIR')}
@@ -1293,6 +1372,7 @@ if [[ ! -f "$PLUGIN_PACKAGE" ]]; then
 fi
 
 mkdir -p "$(dirname "$INSTALL_DIR")" "$SKILLS_ROOT"
+${renderInstallerSavedUserConfigCaptureSnippet(config, 'opencode', '$INSTALL_DIR')}
 rm -rf "$INSTALL_DIR"
 cp -R "$BUNDLE_DIR" "$INSTALL_DIR"
 ${renderInstallerUserConfigSnippet(config, 'opencode', '$INSTALL_DIR')}

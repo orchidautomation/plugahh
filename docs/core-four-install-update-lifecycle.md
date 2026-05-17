@@ -88,7 +88,9 @@ The newest live Codex proof on 2026-05-13 narrowed the remaining gap further:
 
 Treat that as a runtime activation caveat plus a current runtime/docs drift, not a bundle-shape defect. The remaining live-proof gap is trusted-and-reviewed interactive hook execution, plus whether reviewed hooks can ever fire headlessly under `codex exec`.
 
-If a Codex plugin-owned MCP needs an API key, install-time `userConfig` is the expected Pluxx path. Codex may not provide a global MCP settings form for that plugin-owned secret, so reinstall with the real env var exported or rerun the installer interactively. Generated `pluxx publish` installer scripts should prompt consumers for required secrets, materialize them into the installed bundle, reject obvious placeholder values, and let `doctor --consumer` warn if an older install contains one.
+If a Codex plugin-owned MCP needs an API key, install-time `userConfig` is the expected Pluxx path. Codex may not provide a global MCP settings form for that plugin-owned secret, so use the generated installer with the real env var exported or rerun it interactively on first setup. Generated `pluxx publish` installer scripts prompt consumers for required secrets, materialize them into the installed bundle, reject obvious placeholder values, and let `doctor --consumer` warn if an older install contains one.
+
+For release-installer updates, generated Claude Code, Cursor, Codex, and OpenCode scripts preserve the previous installed `.pluxx-user.json` before replacing the bundle. When a saved value is present, nonempty, and not placeholder-looking, the installer reuses it and prints a short non-secret reuse message. Explicit env vars still win over saved values, and `PLUXX_RECONFIGURE=1` forces the installer to ignore saved config so the user can provide fresh values.
 
 ## Installer-Owned Runtime Scripts
 

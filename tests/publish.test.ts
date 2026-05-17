@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
-import type { PluginConfig } from '../src/schema'
+import type { PluginConfig, TargetPlatform } from '../src/schema'
 import { planPublish, runPublish } from '../src/cli/publish'
 
 const ROOT = resolve(import.meta.dir, '.publish-fixture')
@@ -62,6 +62,228 @@ const CODEX_HOOK_FILES = {
       ],
     },
   }),
+}
+
+const GENERATED_INSTALLER_FIXTURE_FILES: Record<TargetPlatform, Record<string, string>> = {
+  'claude-code': {
+    '.claude-plugin/plugin.json': JSON.stringify({
+      name: 'publish-plugin',
+      version: '1.2.3',
+      description: 'A publish test plugin',
+    }),
+  },
+  cursor: {
+    '.cursor-plugin/plugin.json': JSON.stringify({
+      name: 'publish-plugin',
+      version: '1.2.3',
+      description: 'A publish test plugin',
+    }),
+  },
+  codex: {
+    '.codex-plugin/plugin.json': JSON.stringify({
+      name: 'publish-plugin',
+      version: '1.2.3',
+    }),
+  },
+  opencode: {
+    'package.json': JSON.stringify({
+      name: '@orchid/publish-plugin-opencode',
+      version: '1.2.3',
+      type: 'module',
+    }),
+    'index.ts': 'export const PublishPlugin = async () => ({})\n',
+  },
+  'github-copilot': {},
+  openhands: {},
+  warp: {},
+  'gemini-cli': {},
+  'roo-code': {},
+  cline: {},
+  amp: {},
+}
+
+let generatedInstallerRunCount = 0
+
+function prepareBuiltTargetAt(rootDir: string, platform: string, extraFiles: Record<string, string> = {}): void {
+  const dir = resolve(rootDir, 'dist', platform)
+  mkdirSync(dir, { recursive: true })
+  for (const [relativePath, content] of Object.entries(extraFiles)) {
+    const fullPath = resolve(dir, relativePath)
+    mkdirSync(resolve(fullPath, '..'), { recursive: true })
+    writeFileSync(fullPath, content)
+  }
+}
+
+function makeUserConfigInstallerConfig(platform: TargetPlatform, required = true): PluginConfig {
+  return {
+    ...makeConfig(),
+    targets: [platform],
+    userConfig: [
+      {
+        key: 'instantly-api-key',
+        title: 'Instantly API Key',
+        type: 'secret',
+        required,
+        envVar: 'SENDLENS_INSTANTLY_API_KEY',
+      },
+    ],
+  }
+}
+
+interface GeneratedInstallerRunOptions {
+  config?: PluginConfig
+  env?: Record<string, string>
+  existingUserConfig?: unknown
+  extraFiles?: Record<string, string>
+}
+
+interface GeneratedInstallerRunResult {
+  status: number | null
+  stdout: string
+  stderr: string
+  installerContent: string
+  installedUserConfig?: {
+    values?: Record<string, unknown>
+    env?: Record<string, unknown>
+  }
+}
+
+function getGeneratedInstallerPaths(platform: TargetPlatform, rootDir: string): {
+  installDir: string
+  pluginInstallDir: string
+  env: Record<string, string>
+} {
+  if (platform === 'claude-code') {
+    const installRoot = resolve(rootDir, 'claude-marketplace')
+    return {
+      installDir: installRoot,
+      pluginInstallDir: resolve(installRoot, 'plugins/publish-plugin'),
+      env: {
+        PLUXX_CLAUDE_MARKETPLACE_DIR: installRoot,
+        PLUXX_CLAUDE_SKIP_INSTALL: '1',
+      },
+    }
+  }
+
+  if (platform === 'cursor') {
+    const installDir = resolve(rootDir, 'installed-cursor')
+    return {
+      installDir,
+      pluginInstallDir: installDir,
+      env: { PLUXX_CURSOR_INSTALL_DIR: installDir },
+    }
+  }
+
+  if (platform === 'codex') {
+    const installDir = resolve(rootDir, 'installed-codex')
+    return {
+      installDir,
+      pluginInstallDir: installDir,
+      env: {
+        PLUXX_CODEX_INSTALL_DIR: installDir,
+        PLUXX_CODEX_MARKETPLACE_PATH: resolve(rootDir, 'codex-marketplace.json'),
+        PLUXX_CODEX_CONFIG_PATH: resolve(rootDir, 'codex-config.toml'),
+      },
+    }
+  }
+
+  if (platform === 'opencode') {
+    const installDir = resolve(rootDir, 'installed-opencode')
+    return {
+      installDir,
+      pluginInstallDir: installDir,
+      env: {
+        PLUXX_OPENCODE_INSTALL_DIR: installDir,
+        PLUXX_OPENCODE_ENTRY_PATH: resolve(rootDir, 'publish-plugin.ts'),
+        PLUXX_OPENCODE_SKILLS_ROOT: resolve(rootDir, 'opencode-skills'),
+      },
+    }
+  }
+
+  throw new Error(`Unsupported generated installer test platform: ${platform}`)
+}
+
+function runGeneratedInstaller(
+  platform: TargetPlatform,
+  options: GeneratedInstallerRunOptions = {},
+): GeneratedInstallerRunResult {
+  const rootDir = resolve(ROOT, `generated-installer-${platform}-${generatedInstallerRunCount++}`)
+  const config = options.config ?? makeUserConfigInstallerConfig(platform)
+  const paths = getGeneratedInstallerPaths(platform, rootDir)
+  const fixtureFiles = {
+    ...GENERATED_INSTALLER_FIXTURE_FILES[platform],
+    ...(options.extraFiles ?? {}),
+  }
+  prepareBuiltTargetAt(rootDir, platform, fixtureFiles)
+
+  if (options.existingUserConfig !== undefined) {
+    mkdirSync(paths.pluginInstallDir, { recursive: true })
+    writeFileSync(
+      resolve(paths.pluginInstallDir, '.pluxx-user.json'),
+      JSON.stringify(options.existingUserConfig, null, 2) + '\n',
+    )
+  }
+
+  let installerRun: GeneratedInstallerRunResult | undefined
+  const result = runPublish(config, {
+    rootDir,
+    requestedChannels: ['github-release'],
+    runCommand: (command, args, commandOptions) => {
+      if (command === 'tar') {
+        const proc = spawnSync(command, args, {
+          cwd: commandOptions?.cwd,
+          encoding: 'utf-8',
+        })
+        return {
+          status: proc.status,
+          stdout: proc.stdout ?? '',
+          stderr: proc.stderr ?? '',
+        }
+      }
+
+      if (command === 'git') return { status: 0, stdout: '', stderr: '' }
+      if (command === 'gh' && args[0] === 'auth') return { status: 0, stdout: '', stderr: '' }
+      if (command === 'gh' && args[0] === 'release' && args[1] === 'view') return { status: 1, stdout: '', stderr: 'missing' }
+      if (command === 'gh' && args[0] === 'release' && args[1] === 'create') {
+        const scriptName = platform === 'claude-code' ? 'install-claude-code.sh' : `install-${platform}.sh`
+        const installerPath = args.find((value) => typeof value === 'string' && value.endsWith(`/${scriptName}`))
+        const archivePath = args.find((value) => typeof value === 'string' && value.endsWith(`/${config.name}-${platform}-latest.tar.gz`))
+
+        const env: Record<string, string> = {
+          ...process.env,
+          HOME: resolve(rootDir, 'home'),
+          ...paths.env,
+          ...options.env,
+        }
+
+        if (platform === 'claude-code') env.PLUXX_CLAUDE_BUNDLE_PATH = archivePath!
+        if (platform === 'cursor') env.PLUXX_CURSOR_BUNDLE_PATH = archivePath!
+        if (platform === 'codex') env.PLUXX_CODEX_BUNDLE_PATH = archivePath!
+        if (platform === 'opencode') env.PLUXX_OPENCODE_BUNDLE_PATH = archivePath!
+
+        const proc = spawnSync('bash', [installerPath!], {
+          encoding: 'utf-8',
+          env,
+        })
+        const userConfigPath = resolve(paths.pluginInstallDir, '.pluxx-user.json')
+        installerRun = {
+          status: proc.status,
+          stdout: proc.stdout ?? '',
+          stderr: proc.stderr ?? '',
+          installerContent: readFileSync(installerPath!, 'utf-8'),
+          installedUserConfig: existsSync(userConfigPath)
+            ? JSON.parse(readFileSync(userConfigPath, 'utf-8'))
+            : undefined,
+        }
+        return { status: 0, stdout: 'created', stderr: '' }
+      }
+      return { status: 0, stdout: '', stderr: '' }
+    },
+  })
+
+  expect(result.ok).toBe(true)
+  expect(installerRun).toBeDefined()
+  return installerRun!
 }
 
 function runGeneratedCodexInstaller(
@@ -363,7 +585,7 @@ describe('runPublish', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect(installerContent).toContain('pluxx_prompt_secret_config "TEST_API_KEY"')
+    expect(installerContent).toContain('pluxx_prompt_secret_config "test-api-key" "TEST_API_KEY"')
     expect(installerContent).toContain('Refusing placeholder-looking secret for $env_var')
     expect(installerContent).toContain("path.join(installDir, '.pluxx-user.json')")
     expect(installerContent).toContain('server.http_headers')
@@ -384,6 +606,77 @@ describe('runPublish', () => {
     expect(installerContent.indexOf('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS')).toBeLessThan(
       installerContent.indexOf('Updated Codex marketplace catalog'),
     )
+  })
+
+  it('reuses saved generated-installer user config across core host updates', () => {
+    const platforms: TargetPlatform[] = ['claude-code', 'cursor', 'codex', 'opencode']
+
+    for (const platform of platforms) {
+      const run = runGeneratedInstaller(platform, {
+        existingUserConfig: {
+          values: { 'instantly-api-key': 'saved-instantly-key' },
+          env: { SENDLENS_INSTANTLY_API_KEY: 'saved-instantly-key' },
+        },
+      })
+
+      expect(run.status).toBe(0)
+      expect(run.stderr).toBe('')
+      expect(run.stdout).toContain('Found existing plugin config; reusing saved install values.')
+      expect(run.installedUserConfig?.values?.['instantly-api-key']).toBe('saved-instantly-key')
+      expect(run.installedUserConfig?.env?.SENDLENS_INSTANTLY_API_KEY).toBe('saved-instantly-key')
+    }
+  })
+
+  it('lets explicit env vars override saved generated-installer user config', () => {
+    const run = runGeneratedInstaller('codex', {
+      existingUserConfig: {
+        values: { 'instantly-api-key': 'old-saved-key' },
+        env: { SENDLENS_INSTANTLY_API_KEY: 'old-saved-key' },
+      },
+      env: { SENDLENS_INSTANTLY_API_KEY: 'fresh-env-key' },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.stderr).toBe('')
+    expect(run.stdout).not.toContain('Found existing plugin config; reusing saved install values.')
+    expect(run.installedUserConfig?.values?.['instantly-api-key']).toBe('fresh-env-key')
+    expect(run.installedUserConfig?.env?.SENDLENS_INSTANTLY_API_KEY).toBe('fresh-env-key')
+  })
+
+  it('lets PLUXX_RECONFIGURE skip saved generated-installer user config', () => {
+    const run = runGeneratedInstaller('codex', {
+      existingUserConfig: {
+        values: { 'instantly-api-key': 'old-saved-key' },
+        env: { SENDLENS_INSTANTLY_API_KEY: 'old-saved-key' },
+      },
+      env: {
+        PLUXX_RECONFIGURE: '1',
+        SENDLENS_INSTANTLY_API_KEY: 'reconfigured-key',
+      },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.stderr).toBe('')
+    expect(run.stdout).not.toContain('Found existing plugin config; reusing saved install values.')
+    expect(run.installerContent).toContain('PLUXX_RECONFIGURE')
+    expect(run.installedUserConfig?.values?.['instantly-api-key']).toBe('reconfigured-key')
+    expect(run.installedUserConfig?.env?.SENDLENS_INSTANTLY_API_KEY).toBe('reconfigured-key')
+  })
+
+  it('ignores placeholder-looking saved generated-installer secret values', () => {
+    const run = runGeneratedInstaller('codex', {
+      config: makeUserConfigInstallerConfig('codex', false),
+      existingUserConfig: {
+        values: { 'instantly-api-key': 'your api key here' },
+        env: { SENDLENS_INSTANTLY_API_KEY: 'your api key here' },
+      },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.stdout).not.toContain('Found existing plugin config; reusing saved install values.')
+    expect(run.stderr).toContain('Ignoring placeholder-looking saved config for SENDLENS_INSTANTLY_API_KEY.')
+    expect(run.installedUserConfig?.values?.['instantly-api-key']).toBeUndefined()
+    expect(run.installedUserConfig?.env?.SENDLENS_INSTANTLY_API_KEY).toBeUndefined()
   })
 
   it('enables Codex plugin-bundled hooks in generated installers when automation opts in', () => {

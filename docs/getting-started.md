@@ -332,7 +332,7 @@ npx @orchid-labs/pluxx doctor --consumer ~/.codex/plugins/<plugin-name>
 
 Then use `Plugins > Refresh` if your Codex UI shows it, or restart Codex.
 
-If the plugin requires an API key, Pluxx materializes that value into the installed bundle during `pluxx install` and in generated `pluxx publish` installer scripts. Published curl installers read the expected env var first and prompt interactively when it is missing. Codex may not expose plugin-owned MCP secrets in the global MCP settings UI, so the intended edit path is to reinstall with the real env var exported or rerun the installer interactively. Pluxx refuses obvious placeholder secrets such as `dummy API key` and `pluxx doctor --consumer` warns if an older install already contains one.
+If the plugin requires an API key, Pluxx materializes that value into the installed bundle during `pluxx install` and in generated `pluxx publish` installer scripts. Published curl installers read the expected env var first and prompt interactively when it is missing. On update, the generated Claude Code, Cursor, Codex, and OpenCode installers reuse the installed `.pluxx-user.json` when it contains non-placeholder values, so users do not have to re-enter the same key on every curl reinstall. Set the env var to override the saved value, or run with `PLUXX_RECONFIGURE=1` to force fresh configuration. Codex may not expose plugin-owned MCP secrets in the global MCP settings UI. Pluxx refuses obvious placeholder secrets such as `dummy API key` and `pluxx doctor --consumer` warns if an older install already contains one.
 
 `pluxx test` runs the default verification contract:
 
