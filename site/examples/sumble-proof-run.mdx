@@ -211,15 +211,15 @@ This is expected:
 ```text
 WARN codex-hooks-external-config [Codex] pluxx.config.ts:
 Pluxx now bundles Codex hooks at hooks/hooks.json, but Codex hook loading may
-still be guarded by hooks = true under [features] in the host runtime.
-Older docs or configs may still refer to codex_hooks. If bundled hooks do not
-activate, enable the current feature flag and reload Codex.
+still require plugin_hooks = true under [features] in the host runtime.
+The general hooks flag covers non-plugin hook config, and older docs or configs
+may still refer to deprecated codex_hooks.
 ```
 
 What this means:
 
 - Claude Code, Cursor, and Codex all receive packaged hook output from this scaffold
-- Codex may still require `[features].hooks = true` in project or user config before those bundled hooks activate
+- Codex plugin-bundled hooks require `[features].plugin_hooks = true`; `[features].hooks = true` is the general non-plugin hook flag
 - the Codex plugin still built and tested successfully
 - the caveat is about runtime activation, not hook packaging parity
 

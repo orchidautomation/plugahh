@@ -1,6 +1,6 @@
 # Core-Four Install And Update Lifecycle
 
-Last updated: 2026-05-13
+Last updated: 2026-05-17
 
 This doc explains the practical install, update, and reload behavior for the four primary Pluxx targets:
 
@@ -65,6 +65,8 @@ When a Pluxx-generated Codex plugin includes `.mcp.json`, Codex may display that
 - confirm tools are visible from the plugin inside chat
 
 If the installed Codex bundle also declares plugin-bundled hooks, `doctor --consumer` and `verify-install` now warn when the checked project and user Codex config layers do not enable `[features].plugin_hooks = true`. These warnings do not mean the bundle is malformed. They mean plugin-bundled hook activation is missing a known prerequisite, not that activation is guaranteed once that prerequisite exists. The general `hooks = true` flag covers non-plugin hook config and defaults on, while `codex_hooks` is deprecated and should not be treated as a plugin-bundled hook fallback.
+
+Generated `pluxx publish --github-release` Codex curl installers also handle this prerequisite for hook-bearing bundles. The generated `install-codex.sh` detects `.codex-plugin/plugin.json` `hooks` or `hooks/hooks.json`, checks `$CODEX_HOME/config.toml` or `~/.codex/config.toml` by default, prompts interactive users to enable `[features].plugin_hooks = true`, supports `PLUXX_CODEX_ENABLE_PLUGIN_HOOKS=1` or `0` for automation, and prints the exact TOML plus restart/refresh guidance when the user skips the edit.
 
 Those consumer checks now also warn when the checked project is not trusted in the user Codex config, because Codex can keep project-local hooks disabled until that trust entry exists. `verify-install` now carries those `doctor --consumer` issue details through directly, so operators see the specific warning code, explanation, and fix instead of only a warning count.
 

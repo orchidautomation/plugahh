@@ -19,7 +19,7 @@ This example is intentionally richer than any one host can preserve 1:1.
 - commands degrade into generated routing guidance and companion files
 - bundles translated hooks at `hooks/hooks.json`
 - keeps `.codex/hooks.generated.json` as a companion/debug mirror
-- readiness keeps `.codex/readiness.generated.json` guidance because some runtimes still gate hook activation behind `[features].hooks = true`, while older docs or configs may still mention `codex_hooks`
+- readiness keeps `.codex/readiness.generated.json` guidance because plugin-bundled hook activation requires `[features].plugin_hooks = true`; `[features].hooks = true` is the general non-plugin hook flag, while older docs or configs may still mention deprecated `codex_hooks`
 
 ## OpenCode
 

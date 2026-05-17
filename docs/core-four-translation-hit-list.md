@@ -1,6 +1,6 @@
 # Core-Four Translation Hit List
 
-Last updated: 2026-05-03
+Last updated: 2026-05-17
 
 ## Doc Links
 

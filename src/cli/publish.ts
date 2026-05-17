@@ -714,6 +714,248 @@ fi
 `
 }
 
+function renderInstallerCodexPluginHooksSnippet(installDirVariable: string): string {
+  return `
+export PLUXX_INSTALL_DIR="${installDirVariable}"
+
+set +e
+node <<'NODE'
+const fs = require('fs')
+const path = require('path')
+
+const installDir = process.env.PLUXX_INSTALL_DIR
+if (!installDir) process.exit(0)
+
+const manifestPath = path.join(installDir, '.codex-plugin/plugin.json')
+const standardHooksPath = path.join(installDir, 'hooks/hooks.json')
+let hasPluginHooks = fs.existsSync(standardHooksPath)
+
+if (fs.existsSync(manifestPath)) {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    const manifestHooks = manifest.hooks
+    hasPluginHooks ||= typeof manifestHooks === 'string' && manifestHooks.trim().length > 0
+    hasPluginHooks ||= Array.isArray(manifestHooks) && manifestHooks.length > 0
+    hasPluginHooks ||= manifestHooks && typeof manifestHooks === 'object' && Object.keys(manifestHooks).length > 0
+    hasPluginHooks ||= manifestHooks === true
+  } catch {}
+}
+
+process.exit(hasPluginHooks ? 0 : 2)
+NODE
+PLUXX_CODEX_BUNDLE_HAS_HOOKS="$?"
+set -e
+
+if [[ "$PLUXX_CODEX_BUNDLE_HAS_HOOKS" == "0" ]]; then
+  CODEX_HOME_DIR="\${CODEX_HOME:-$HOME/.codex}"
+  CODEX_CONFIG_PATH="\${PLUXX_CODEX_CONFIG_PATH:-$CODEX_HOME_DIR/config.toml}"
+  PLUXX_CODEX_HOOKS_MODE="\${PLUXX_CODEX_ENABLE_PLUGIN_HOOKS:-prompt}"
+
+  export CODEX_CONFIG_PATH
+  if node <<'NODE'
+const fs = require('fs')
+const filepath = process.env.CODEX_CONFIG_PATH
+
+function stripTomlComment(line) {
+  let quote = null
+  let escaped = false
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (quote && char === '\\\\') {
+      escaped = true
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = quote === char ? null : quote || char
+      continue
+    }
+    if (!quote && char === '#') return line.slice(0, index)
+  }
+  return line
+}
+
+function isTomlTrue(rawValue) {
+  return /^true\\b/i.test(rawValue.trim())
+}
+
+let text = ''
+try {
+  text = fs.readFileSync(filepath, 'utf8')
+} catch {
+  process.exit(1)
+}
+const lines = text.split(/\\r?\\n/)
+let tableName = ''
+for (const line of lines) {
+  const trimmed = stripTomlComment(line).trim()
+  if (!trimmed) continue
+  const tableMatch = trimmed.match(/^\\[([^\\]]+)\\]$/)
+  if (tableMatch) {
+    tableName = tableMatch[1].trim()
+    continue
+  }
+  if (tableName === '') {
+    const dottedMatch = trimmed.match(/^features\\.plugin_hooks\\s*=\\s*(.+)$/)
+    if (dottedMatch && isTomlTrue(dottedMatch[1])) process.exit(0)
+    const inlineMatch = trimmed.match(/^features\\s*=\\s*(.+)$/)
+    if (inlineMatch && /\\bplugin_hooks\\s*=\\s*true\\b/i.test(inlineMatch[1])) process.exit(0)
+  }
+  if (tableName !== 'features') continue
+  const match = trimmed.match(/^plugin_hooks\\s*=\\s*(.+)$/)
+  if (match && isTomlTrue(match[1])) process.exit(0)
+}
+process.exit(1)
+NODE
+  then
+    echo "Codex plugin-bundled hooks already enabled in $CODEX_CONFIG_PATH."
+  else
+    PLUXX_ENABLE_CODEX_HOOKS="0"
+    case "$PLUXX_CODEX_HOOKS_MODE" in
+      1|true|TRUE|yes|YES|always|ALWAYS)
+        PLUXX_ENABLE_CODEX_HOOKS="1"
+        ;;
+      0|false|FALSE|no|NO|never|NEVER|skip|SKIP)
+        PLUXX_ENABLE_CODEX_HOOKS="0"
+        ;;
+      *)
+        if [[ -r /dev/tty ]]; then
+          echo "This Codex plugin bundle includes startup hooks." >/dev/tty
+          echo "Codex requires [features].plugin_hooks = true before plugin-bundled hooks can run." >/dev/tty
+          read -r -p "Enable Codex plugin-bundled hooks in $CODEX_CONFIG_PATH now? [Y/n] " PLUXX_CODEX_HOOKS_REPLY </dev/tty
+          case "$PLUXX_CODEX_HOOKS_REPLY" in
+            n|N|no|NO)
+              PLUXX_ENABLE_CODEX_HOOKS="0"
+              ;;
+            *)
+              PLUXX_ENABLE_CODEX_HOOKS="1"
+              ;;
+          esac
+        fi
+        ;;
+    esac
+
+    if [[ "$PLUXX_ENABLE_CODEX_HOOKS" == "1" ]]; then
+      mkdir -p "$(dirname "$CODEX_CONFIG_PATH")"
+      node <<'NODE'
+const fs = require('fs')
+const path = require('path')
+
+const filepath = process.env.CODEX_CONFIG_PATH
+
+function stripTomlComment(line) {
+  let quote = null
+  let escaped = false
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (quote && char === '\\\\') {
+      escaped = true
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = quote === char ? null : quote || char
+      continue
+    }
+    if (!quote && char === '#') return line.slice(0, index)
+  }
+  return line
+}
+
+let text = ''
+try {
+  text = fs.readFileSync(filepath, 'utf8')
+} catch {}
+
+const lines = text.split(/\\r?\\n/)
+if (lines.length === 1 && lines[0] === '') lines.pop()
+
+let start = -1
+let end = lines.length
+let firstTopLevelFeaturesDotted = -1
+let topLevelPluginHooksDotted = -1
+let topLevelInlineFeatures = -1
+let tableName = ''
+for (let index = 0; index < lines.length; index += 1) {
+  const trimmed = stripTomlComment(lines[index]).trim()
+  const tableMatch = trimmed.match(/^\\[([^\\]]+)\\]$/)
+  if (tableMatch) tableName = tableMatch[1].trim()
+
+  if (trimmed === '[features]') {
+    start = index
+    break
+  }
+
+  if (tableName === '') {
+    if (/^features\\.[A-Za-z0-9_-]+\\s*=/.test(trimmed) && firstTopLevelFeaturesDotted < 0) {
+      firstTopLevelFeaturesDotted = index
+    }
+    if (/^features\\.plugin_hooks\\s*=/.test(trimmed)) {
+      topLevelPluginHooksDotted = index
+    }
+    if (/^features\\s*=\\s*\\{/.test(trimmed)) {
+      topLevelInlineFeatures = index
+    }
+  }
+}
+
+if (start >= 0) {
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^\\s*\\[[^\\]]+\\]/.test(stripTomlComment(lines[index]))) {
+      end = index
+      break
+    }
+  }
+
+  let updated = false
+  for (let index = start + 1; index < end; index += 1) {
+    if (/^plugin_hooks\\s*=/.test(stripTomlComment(lines[index]).trim())) {
+      lines[index] = 'plugin_hooks = true'
+      updated = true
+    }
+  }
+  if (!updated) lines.splice(start + 1, 0, 'plugin_hooks = true')
+} else if (topLevelPluginHooksDotted >= 0) {
+  lines[topLevelPluginHooksDotted] = 'features.plugin_hooks = true'
+} else if (firstTopLevelFeaturesDotted >= 0) {
+  lines.splice(firstTopLevelFeaturesDotted + 1, 0, 'features.plugin_hooks = true')
+} else if (topLevelInlineFeatures >= 0 && lines[topLevelInlineFeatures].includes('}')) {
+  if (/\\bplugin_hooks\\s*=/.test(lines[topLevelInlineFeatures])) {
+    lines[topLevelInlineFeatures] = lines[topLevelInlineFeatures].replace(
+      /\\bplugin_hooks\\s*=\\s*(true|false)\\b/i,
+      'plugin_hooks = true',
+    )
+  } else {
+    lines[topLevelInlineFeatures] = lines[topLevelInlineFeatures].replace(/}/, ', plugin_hooks = true }')
+  }
+} else {
+  if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('')
+  lines.push('[features]', 'plugin_hooks = true')
+}
+
+fs.mkdirSync(path.dirname(filepath), { recursive: true })
+fs.writeFileSync(filepath, lines.join('\\n') + '\\n')
+NODE
+      echo "Enabled Codex plugin-bundled hooks in $CODEX_CONFIG_PATH."
+      echo "Restart or refresh Codex before relying on plugin startup hooks."
+    else
+      echo "Codex plugin-bundled hooks are not enabled. Startup hooks from this plugin will not run until you add this to $CODEX_CONFIG_PATH:" >&2
+      echo "[features]" >&2
+      echo "plugin_hooks = true" >&2
+      echo "Then restart or refresh Codex before relying on plugin startup hooks." >&2
+      echo "Set PLUXX_CODEX_ENABLE_PLUGIN_HOOKS=1 before running this installer to enable it noninteractively." >&2
+    fi
+  fi
+fi
+`
+}
+
 function renderInstallClaudeCodeScript(config: PluginConfig): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
@@ -937,6 +1179,7 @@ cp -R "$BUNDLE_DIR" "$INSTALL_DIR"
 ${renderInstallerUserConfigSnippet(config, 'codex', '$INSTALL_DIR')}
 ${renderInstallerMcpPathMaterializationSnippet('codex', '$INSTALL_DIR')}
 ${renderInstallerRuntimeBootstrapSnippet('$INSTALL_DIR')}
+${renderInstallerCodexPluginHooksSnippet('$INSTALL_DIR')}
 
 mkdir -p "$(dirname "$MARKETPLACE_PATH")"
 

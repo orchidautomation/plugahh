@@ -1,6 +1,6 @@
 # Start Here
 
-Last updated: 2026-05-13
+Last updated: 2026-05-17
 
 ## Doc Links
 
@@ -306,9 +306,10 @@ The repo already proves a lot.
 - example and packaged-runtime parity is current again:
   - `examples/prospeo-mcp` now bundles its `scripts/` payload into built outputs
   - the example now points at the official `@prospeo/prospeo-mcp-server` package instead of a stale repo-local runtime path
-- the current release gate is green again as of 2026-05-13:
+- the current release gate is green again as of 2026-05-17:
   - `npm test` passed
   - `npm run release:check` passed
+- the latest published npm package is `@orchid-labs/pluxx@0.1.18`
 - OpenCode-native agent output is now permission-first:
   - legacy agent `tools` input is translated forward where possible
   - native OpenCode `skill` and `task` permission keys are treated as real first-class surfaces
@@ -472,17 +473,18 @@ Run two lanes in parallel:
 - MCP vendor lane
 - internal AI platform / design-partner lane
 
-### 6. Next Release
+### 6. Release State
 
-The code and packaged tarball are now mechanically ready for the next cut.
+The current public release is `0.1.18`.
 
-The remaining release checklist is:
+The release checklist for the current cut is complete:
 
-- bump `package.json` from `0.1.7` to the next version
-- commit the release-prep fixes and doc/source-of-truth sync
-- push `main`
-- push the matching `vX.Y.Z` tag so GitHub Actions publishes to npm
-- verify the npm package version, GitHub release, and attached tarball after the workflow completes
+- `package.json` and `package-lock.json` are at `0.1.18`
+- local `main` is tagged `v0.1.18`
+- npm reports `@orchid-labs/pluxx@0.1.18` as latest
+- the release gate has been rerun locally, including package runtime verification and dry-run pack
+
+For the next release, start from the current version, rerun `npm run release:check`, bump the package version, push `main`, push the matching `vX.Y.Z` tag, and verify npm plus GitHub release artifacts after the workflow completes.
 
 ## Working Rules
 

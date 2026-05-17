@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-05-13
+Last updated: 2026-05-17
 
 ## Doc Links
 
@@ -192,9 +192,10 @@ The closure plan is now narrower than it was before:
 - the self-hosted `example/pluxx` source project now also carries maintained behavioral smoke cases for:
   - `verify-install`
   - `translate-hosts` with a Codex hooks focus
-- the release gate is green again as of 2026-05-13:
+- the release gate is green again as of 2026-05-17:
   - `npm test` passed
   - `npm run release:check` passed
+- the latest published npm package is `@orchid-labs/pluxx@0.1.18`
 - OpenClaw should stay in scope only as a beta-target lane until a native generator, validator/doctor path, and behavioral smoke proof exist:
   - [docs/openclaw-target-evaluation.md](./openclaw-target-evaluation.md)
 
@@ -343,12 +344,14 @@ This is for learning and proof, not for prematurely building the full trust laye
 
 ### 6. Next release
 
-The next npm cut is now primarily an operations step rather than a code-confidence step.
+The current public npm cut is `0.1.18`.
 
-The remaining release checklist is:
+The next npm cut should stay primarily an operations step rather than a code-confidence rescue step.
 
-- bump `package.json` to the next version
-- commit and push the release-prep fixes and source-of-truth updates
+- start from `0.1.18`
+- rerun `npm run release:check`
+- bump `package.json` and `package-lock.json` to the next version
+- commit and push release-prep fixes and source-of-truth updates
 - push the matching `vX.Y.Z` tag to trigger the GitHub Actions publish workflow
 - verify the npm package version, GitHub release, and attached tarball after the workflow completes
 

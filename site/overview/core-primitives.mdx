@@ -44,7 +44,7 @@ For cross-host compilation, Pluxx should reason about that model through eight l
 | `agents` | `agents` | Specialist execution surfaces differ too much to collapse into skills. |
 | `hooks` | `hooks` | Event vocabularies differ per host, but deterministic automation is still core. |
 | `permissions` | `permissions` | `allow` / `ask` / `deny` intent needs a portable home even when hosts enforce it differently. |
-| `runtime` | `mcp`, runtime auth, local runtimes, passthrough dirs, helper scripts | This is the execution and integration layer. |
+| `runtime` | `mcp`, runtime auth, runtime readiness, local runtimes, passthrough dirs, helper scripts | This is the execution and integration layer. |
 | `distribution` | `userConfig`, `brand`, packaging metadata, install/publish metadata, supporting assets | This is the install surface users actually touch. |
 
 `taxonomy` stays internal. It is the compiler's semantic source of truth for how workflows should be grouped and routed, but it is not a host-facing primitive on its own.
@@ -60,16 +60,28 @@ interface PluxxPrimitiveModel {
   hooks?: HookSpec[]
   permissions?: PermissionSpec[]
   runtime?: {
-    mcp?: McpSpec
-    auth?: RuntimeAuthSpec[]
-    passthrough?: string[]
-    scripts?: string[]
-    assets?: string[]
+    mcp?: {
+      servers?: McpSpec
+      auth?: RuntimeAuthSpec[]
+    }
+    readiness?: RuntimeReadinessSpec[]
+    payload?: {
+      passthrough?: string[]
+      scripts?: string[]
+      assets?: string[]
+    }
   }
   distribution?: {
-    userConfig?: UserConfigSpec[]
-    brand?: BrandSpec
-    install?: InstallSurfaceSpec
+    identity?: IdentitySpec
+    branding?: BrandSpec
+    install?: {
+      userConfig?: UserConfigSpec[]
+      surface?: InstallSurfaceSpec
+    }
+    output?: {
+      targets?: TargetPlatform[]
+      outDir?: string
+    }
     publish?: PublishSurfaceSpec
   }
   taxonomy: TaxonomySpec
@@ -103,10 +115,17 @@ This is the runtime integration layer.
 - Transport
 - auth shape
 - import auth vs runtime auth
+- runtime readiness and background refresh gates
 - remote vs local stdio
 - target-specific MCP config compilation
 
-Pluxx is MCP-first, so this remains core.
+MCP is optional in the config, but common enough across real plugin projects that it remains core. Internally, the compiler treats runtime as at least three subcontracts:
+
+- MCP and auth shaping
+- readiness and refresh gating
+- generic bundled payload support such as scripts, assets, and passthrough dirs
+
+MCP-backed plugins are the flagship wedge because the cross-host differences are sharpest there.
 
 ### 4. userConfig
 

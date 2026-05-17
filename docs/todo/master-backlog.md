@@ -1,6 +1,6 @@
 # Master Backlog
 
-Last updated: 2026-05-13
+Last updated: 2026-05-17
 
 This is the most complete repo-native backlog for Pluxx.
 
@@ -134,7 +134,7 @@ Any person or agent should be able to enter the repo and answer:
 - [~] Keep local proof orchestration honest:
   - `npm test` now fails fast when another full-suite run is already active in the same worktree
   - the follow-on work is removing more repo-local shared fixture and cwd assumptions so worktree-local serialization is no longer carrying as much reliability weight
-  - the current worktree release gate is green again with a passing `npm test` and `npm run release:check`
+  - the current worktree release gate is green again with a passing `npm test`, package runtime verification, dry-run pack, and `npm run release:check` as of 2026-05-17
 - [x] Use [author-once-hardening.md](./author-once-hardening.md) as the initiative-level TODO for closing the main author-once gap between:
   - the author-once vision
   - the currently shipped compiler, proof, and onboarding reality
@@ -391,8 +391,10 @@ Open work:
 - [x] Validate the current self-hosting flow end to end
 - [x] Run tests, release smoke, and the packaged-runtime release gate before the next cut
 - [x] Restore example parity for `examples/prospeo-mcp` so release smoke and the real package agree again
-- [ ] Bump `package.json` to the next version
-- [ ] Commit and push the release-prep fixes to `main`
+- [x] Publish and verify `@orchid-labs/pluxx@0.1.18`
+- [ ] For the next cut, bump `package.json` from `0.1.18` to the next version
+- [ ] Rerun `npm run release:check` before tagging
+- [ ] Commit and push release-prep fixes to `main`
 - [ ] Push the matching `vX.Y.Z` tag so the GitHub Actions release workflow publishes to npm
 - [ ] Verify the published npm version and GitHub release artifacts after the workflow completes
 

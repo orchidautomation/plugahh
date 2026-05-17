@@ -123,6 +123,7 @@ GitHub Release channel owns:
 
 - creating/updating release entry for the version
 - uploading built plugin bundle artifacts for manual or platform-specific install flows
+- generating host installer scripts, including `install-codex.sh` hook-gate handling for hook-bearing Codex bundles that need `[features].plugin_hooks = true`
 - release notes body (initially templated/minimal in v1)
 
 When both channels are enabled, failure handling should report per-channel outcome and return non-zero if any enabled channel fails.

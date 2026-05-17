@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 import type { PluginConfig } from '../src/schema'
@@ -30,6 +30,106 @@ function prepareBuiltTarget(platform: string, extraFiles: Record<string, string>
     mkdirSync(resolve(fullPath, '..'), { recursive: true })
     writeFileSync(fullPath, content)
   }
+}
+
+interface CodexInstallerRunOptions {
+  configText?: string
+  env?: Record<string, string>
+}
+
+interface CodexInstallerRunResult {
+  status: number | null
+  stdout: string
+  stderr: string
+  configText?: string
+  installerContent: string
+}
+
+const CODEX_HOOK_FILES = {
+  '.codex-plugin/plugin.json': JSON.stringify({
+    name: 'publish-plugin',
+    version: '1.2.3',
+    hooks: './hooks/hooks.json',
+  }),
+  'hooks/hooks.json': JSON.stringify({
+    hooks: {
+      SessionStart: [
+        {
+          hooks: [
+            { type: 'command', command: 'echo startup' },
+          ],
+        },
+      ],
+    },
+  }),
+}
+
+function runGeneratedCodexInstaller(
+  extraFiles: Record<string, string>,
+  options: CodexInstallerRunOptions = {},
+): CodexInstallerRunResult {
+  const config: PluginConfig = {
+    ...makeConfig(),
+    targets: ['codex'],
+  }
+  prepareBuiltTarget('codex', extraFiles)
+
+  const configPath = resolve(ROOT, 'codex-config.toml')
+  if (options.configText !== undefined) {
+    mkdirSync(resolve(configPath, '..'), { recursive: true })
+    writeFileSync(configPath, options.configText)
+  }
+
+  let installerRun: CodexInstallerRunResult | undefined
+  const result = runPublish(config, {
+    rootDir: ROOT,
+    requestedChannels: ['github-release'],
+    runCommand: (command, args, commandOptions) => {
+      if (command === 'tar') {
+        const proc = spawnSync(command, args, {
+          cwd: commandOptions?.cwd,
+          encoding: 'utf-8',
+        })
+        return {
+          status: proc.status,
+          stdout: proc.stdout ?? '',
+          stderr: proc.stderr ?? '',
+        }
+      }
+
+      if (command === 'git') return { status: 0, stdout: '', stderr: '' }
+      if (command === 'gh' && args[0] === 'auth') return { status: 0, stdout: '', stderr: '' }
+      if (command === 'gh' && args[0] === 'release' && args[1] === 'view') return { status: 1, stdout: '', stderr: 'missing' }
+      if (command === 'gh' && args[0] === 'release' && args[1] === 'create') {
+        const installerPath = args.find((value) => typeof value === 'string' && value.endsWith('/install-codex.sh'))
+        const archivePath = args.find((value) => typeof value === 'string' && value.endsWith('/publish-plugin-codex-latest.tar.gz'))
+        const proc = spawnSync('bash', [installerPath!], {
+          encoding: 'utf-8',
+          env: {
+            ...process.env,
+            ...options.env,
+            PLUXX_CODEX_BUNDLE_PATH: archivePath!,
+            PLUXX_CODEX_INSTALL_DIR: resolve(ROOT, 'installed-codex'),
+            PLUXX_CODEX_MARKETPLACE_PATH: resolve(ROOT, 'codex-marketplace.json'),
+            PLUXX_CODEX_CONFIG_PATH: configPath,
+          },
+        })
+        installerRun = {
+          status: proc.status,
+          stdout: proc.stdout ?? '',
+          stderr: proc.stderr ?? '',
+          configText: existsSync(configPath) ? readFileSync(configPath, 'utf-8') : undefined,
+          installerContent: readFileSync(installerPath!, 'utf-8'),
+        }
+        return { status: 0, stdout: 'created', stderr: '' }
+      }
+      return { status: 0, stdout: '', stderr: '' }
+    },
+  })
+
+  expect(result.ok).toBe(true)
+  expect(installerRun).toBeDefined()
+  return installerRun!
 }
 
 afterEach(() => {
@@ -223,7 +323,7 @@ describe('runPublish', () => {
       outDir: './dist',
     }
     prepareBuiltTarget('codex', {
-      '.codex-plugin/plugin.json': JSON.stringify({ name: 'publish-plugin', version: '1.2.3' }),
+      ...CODEX_HOOK_FILES,
       '.mcp.json': JSON.stringify({
         mcpServers: {
           fixture: { url: 'https://example.com/mcp', bearer_token_env_var: 'TEST_API_KEY' },
@@ -270,13 +370,60 @@ describe('runPublish', () => {
     expect(installerContent).toContain('delete server.bearer_token_env_var')
     expect(installerContent).toContain('Preparing local plugin runtime dependencies...')
     expect(installerContent).toContain('bash "$INSTALL_DIR/scripts/bootstrap-runtime.sh"')
+    expect(installerContent).toContain('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS')
+    expect(installerContent).toContain('Codex requires [features].plugin_hooks = true')
+    expect(installerContent).toContain('plugin_hooks = true')
     expect(installerContent).toContain('materializeInstalledStdioPath')
     expect(installerContent).toContain("path.resolve(installDir, normalized)")
     expect(installerContent.indexOf('PLUXX_USER_CONFIG_SPEC')).toBeLessThan(
       installerContent.indexOf('Preparing local plugin runtime dependencies...'),
     )
     expect(installerContent.indexOf('Preparing local plugin runtime dependencies...')).toBeLessThan(
+      installerContent.indexOf('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS'),
+    )
+    expect(installerContent.indexOf('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS')).toBeLessThan(
       installerContent.indexOf('Updated Codex marketplace catalog'),
     )
+  })
+
+  it('enables Codex plugin-bundled hooks in generated installers when automation opts in', () => {
+    const run = runGeneratedCodexInstaller(CODEX_HOOK_FILES, {
+      configText: '[features]\nhooks = true\n',
+      env: { PLUXX_CODEX_ENABLE_PLUGIN_HOOKS: '1' },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.stderr).toBe('')
+    expect(run.stdout).toContain('Enabled Codex plugin-bundled hooks')
+    expect(run.stdout).toContain('Restart or refresh Codex')
+    expect(run.configText).toContain('[features]\nplugin_hooks = true\nhooks = true\n')
+    expect(run.installerContent).toContain('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS')
+    expect(run.installerContent).toContain('features\\.plugin_hooks')
+  })
+
+  it('prints exact Codex hook TOML and leaves config unchanged when explicitly skipped', () => {
+    const run = runGeneratedCodexInstaller(CODEX_HOOK_FILES, {
+      env: { PLUXX_CODEX_ENABLE_PLUGIN_HOOKS: '0' },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.configText).toBeUndefined()
+    expect(run.stderr).toContain('[features]')
+    expect(run.stderr).toContain('plugin_hooks = true')
+    expect(run.stderr).toContain('Then restart or refresh Codex')
+    expect(run.stderr).toContain('PLUXX_CODEX_ENABLE_PLUGIN_HOOKS=1')
+  })
+
+  it('does not touch Codex hook config for bundles without plugin hooks', () => {
+    const run = runGeneratedCodexInstaller({
+      '.codex-plugin/plugin.json': JSON.stringify({ name: 'publish-plugin', version: '1.2.3' }),
+    }, {
+      env: { PLUXX_CODEX_ENABLE_PLUGIN_HOOKS: '1' },
+    })
+
+    expect(run.status).toBe(0)
+    expect(run.configText).toBeUndefined()
+    expect(run.stdout).not.toContain('Enabled Codex plugin-bundled hooks')
+    expect(run.stderr).not.toContain('plugin_hooks = true')
   })
 })
