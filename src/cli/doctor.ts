@@ -1526,6 +1526,9 @@ function checkInstalledBundleIntegrity(checks: DoctorCheck[], rootDir: string, l
   if (issues.missingHookTargets.length > 0) {
     details.push(`hook commands reference missing bundle target${issues.missingHookTargets.length === 1 ? '' : 's'}: ${issues.missingHookTargets.join(', ')}`)
   }
+  if (issues.cwdUnsafeHookCommands.length > 0) {
+    details.push(`Codex hook command${issues.cwdUnsafeHookCommands.length === 1 ? ' depends' : 's depend'} on plugin-root cwd: ${issues.cwdUnsafeHookCommands.join('; ')}`)
+  }
   if (issues.invalidRuntimeScripts.length > 0) {
     details.push(`runtime startup still depends on installer-owned validation: ${issues.invalidRuntimeScripts.join(', ')}`)
   }
@@ -1547,7 +1550,7 @@ function checkInstalledBundleIntegrity(checks: DoctorCheck[], rootDir: string, l
     code: 'consumer-bundle-integrity-invalid',
     title: 'Installed bundle integrity is broken',
     detail: details.join('; '),
-    fix: 'Reinstall the plugin or rebuild the bundle so every manifest path, hook config, and hook target is valid inside the installed plugin.',
+    fix: 'Reinstall the plugin or rebuild the bundle so every manifest path, hook config, and hook command resolves from the installed plugin root.',
     path: layout.manifestPath,
   })
 }
@@ -1658,7 +1661,7 @@ function checkInstalledCodexHooksFeatureFlag(
     })
   }
 
-  const legacyOnlyProbes = probes.filter((probe) => probe.alternateEnabled && !probe.recommendedEnabled)
+  const legacyOnlyProbes = probes.filter((probe) => !probe.pluginBundledEnabled && probe.alternateEnabled && !probe.recommendedEnabled)
   if (legacyOnlyProbes.length > 0) {
     addCheck(checks, {
       level: 'warning',

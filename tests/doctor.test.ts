@@ -252,7 +252,58 @@ function createCodexHookConsumerFixture(): string {
             hooks: [
               {
                 type: 'command',
-                command: 'bash ./scripts/session-start.sh',
+                command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
+              },
+            ],
+          },
+        ],
+      },
+    }, null, 2),
+  )
+
+  return dir
+}
+
+function createCodexCwdUnsafeHookConsumerFixture(): string {
+  const dir = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-cwd-hook-'))
+  mkdirSync(resolve(dir, '.codex-plugin'), { recursive: true })
+  mkdirSync(resolve(dir, 'skills/hello'), { recursive: true })
+  mkdirSync(resolve(dir, 'hooks'), { recursive: true })
+  mkdirSync(resolve(dir, 'scripts'), { recursive: true })
+
+  writeFileSync(
+    resolve(dir, '.codex-plugin/plugin.json'),
+    JSON.stringify({
+      name: 'codex-cwd-hook-fixture',
+      version: '0.1.0',
+      skills: './skills/',
+      hooks: './hooks/hooks.json',
+    }, null, 2),
+  )
+  writeFileSync(resolve(dir, 'skills/hello/SKILL.md'), '# Hello\n')
+  writeFileSync(resolve(dir, 'scripts/session-start.sh'), '#!/usr/bin/env bash\nexit 0\n')
+  writeFileSync(
+    resolve(dir, 'hooks/pluxx-hook-command-1.sh'),
+    [
+      '#!/usr/bin/env bash',
+      'set -euo pipefail',
+      'PLUXX_PLUGIN_ROOT="${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"',
+      'PLUXX_HOOK_COMMAND=\'bash "./scripts/session-start.sh"\'',
+      'eval "$PLUXX_HOOK_COMMAND"',
+      '',
+    ].join('\n'),
+  )
+  writeFileSync(
+    resolve(dir, 'hooks/hooks.json'),
+    JSON.stringify({
+      version: 1,
+      hooks: {
+        SessionStart: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'bash ./hooks/pluxx-hook-command-1.sh',
               },
             ],
           },
@@ -829,6 +880,23 @@ describe('doctorConsumer', () => {
     }
   })
 
+  it('fails when installed Codex hook commands depend on plugin-root cwd', async () => {
+    const dir = createCodexCwdUnsafeHookConsumerFixture()
+
+    try {
+      const report = await doctorConsumer(dir)
+      const details = report.checks.map((check) => check.detail).join('\n')
+
+      expect(report.ok).toBe(false)
+      expect(report.checks.some((check) => check.code === 'consumer-bundle-integrity-invalid' && check.level === 'error')).toBe(true)
+      expect(details).toContain('Codex hook commands depend on plugin-root cwd')
+      expect(details).toContain('bash ./hooks/pluxx-hook-command-1.sh uses cwd-relative bundle target(s): ./hooks/pluxx-hook-command-1.sh')
+      expect(details).toContain('hooks/pluxx-hook-command-1.sh evaluates cwd-relative bundle target(s): ./scripts/session-start.sh')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('warns when an installed codex bundle includes hooks but host config does not enable hooks', async () => {
     const dir = createCodexHookConsumerFixture()
     const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
@@ -957,7 +1025,7 @@ describe('doctorConsumer', () => {
     }
   })
 
-  it('reports success when a hook-bearing Codex install finds plugin_hooks in the checked config layers', async () => {
+  it('reports success when a hook-bearing Codex install finds plugin_hooks even if codex_hooks is also present', async () => {
     const dir = createCodexHookConsumerFixture()
     const projectRoot = mkdtempSync(resolve(tmpdir(), 'pluxx-doctor-codex-project-'))
     const originalHome = process.env.HOME
@@ -967,7 +1035,7 @@ describe('doctorConsumer', () => {
     delete process.env.CODEX_HOME
     mkdirSync(resolve(projectRoot, '.codex'), { recursive: true })
     mkdirSync(resolve(homeDir, '.codex'), { recursive: true })
-    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
+    writeFileSync(resolve(projectRoot, '.codex/config.toml'), '[features]\nplugin_hooks = true\ncodex_hooks = true\n')
     writeFileSync(
       resolve(homeDir, '.codex/config.toml'),
       `[projects.${JSON.stringify(resolve(projectRoot))}]\ntrust_level = "trusted"\n`,

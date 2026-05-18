@@ -690,7 +690,7 @@ describe('verifyInstall', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'bash ./scripts/session-start.sh',
+                  command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
                 },
               ],
             },
@@ -844,7 +844,7 @@ describe('verifyInstall', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'bash ./scripts/session-start.sh',
+                  command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
                 },
               ],
             },
@@ -899,7 +899,7 @@ describe('verifyInstall', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'bash ./scripts/session-start.sh',
+                  command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
                 },
               ],
             },
@@ -939,14 +939,14 @@ describe('verifyInstall', () => {
     )
   })
 
-  it('passes cleanly for an installed codex bundle with plugin-bundled hooks when the project enables plugin_hooks and the user trusts the project', async () => {
+  it('passes cleanly for an installed codex bundle with plugin-bundled hooks when plugin_hooks and codex_hooks are both enabled and the user trusts the project', async () => {
     mkdirSync(resolve(DIST_DIR, 'codex/.codex-plugin'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/skills/hello'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/hooks'), { recursive: true })
     mkdirSync(resolve(DIST_DIR, 'codex/scripts'), { recursive: true })
     mkdirSync(resolve(ROOT, '.codex'), { recursive: true })
     mkdirSync(resolve(HOME_DIR, '.codex'), { recursive: true })
-    writeFileSync(resolve(ROOT, '.codex/config.toml'), '[features]\nplugin_hooks = true\n')
+    writeFileSync(resolve(ROOT, '.codex/config.toml'), '[features]\nplugin_hooks = true\ncodex_hooks = true\n')
     writeFileSync(
       resolve(HOME_DIR, '.codex/config.toml'),
       `[projects.${JSON.stringify(resolve(ROOT))}]\ntrust_level = "trusted"\n`,
@@ -972,7 +972,7 @@ describe('verifyInstall', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'bash ./scripts/session-start.sh',
+                  command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
                 },
               ],
             },
@@ -1027,7 +1027,7 @@ describe('verifyInstall', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'bash ./scripts/session-start.sh',
+                  command: 'bash "${CODEX_PLUGIN_ROOT}/scripts/session-start.sh"',
                 },
               ],
             },

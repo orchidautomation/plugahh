@@ -3,6 +3,10 @@ function shellSingleQuote(value: string): string {
 }
 
 export function buildHookCommandWrapperScript(command: string, pluginRootVar: string, envFileVar?: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(pluginRootVar)) {
+    throw new Error(`Invalid plugin root environment variable name: ${pluginRootVar}`)
+  }
+
   const serializedCommand = shellSingleQuote(command)
   const exportLoader = [
     'import { readFileSync } from "node:fs"',
@@ -35,6 +39,8 @@ export function buildHookCommandWrapperScript(command: string, pluginRootVar: st
     'set -euo pipefail',
     '',
     `PLUXX_PLUGIN_ROOT="\${${pluginRootVar}:-$(cd "$(dirname "$0")/.." && pwd)}"`,
+    `export ${pluginRootVar}="$PLUXX_PLUGIN_ROOT"`,
+    'export PLUGIN_ROOT="$PLUXX_PLUGIN_ROOT"',
     'PLUXX_USER_CONFIG_PATH="$PLUXX_PLUGIN_ROOT/.pluxx-user.json"',
     '',
     'if [ -f "$PLUXX_USER_CONFIG_PATH" ]; then',
