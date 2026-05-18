@@ -1,4 +1,4 @@
-import { resolve, dirname } from 'path'
+import { resolve, dirname, basename, relative } from 'path'
 import { existsSync, symlinkSync, mkdirSync, rmSync, readFileSync, writeFileSync, cpSync, readdirSync } from 'fs'
 import { spawnSync } from 'child_process'
 import * as readline from 'readline'
@@ -40,6 +40,7 @@ interface BundleIntegrityIssues {
   hookConfigIssue?: string
   missingManifestPaths: string[]
   missingHookTargets: string[]
+  cwdUnsafeHookCommands: string[]
   invalidRuntimeScripts: string[]
 }
 
@@ -905,7 +906,7 @@ function resolveBundleReference(rootDir: string, value: string): string | undefi
     return resolve(rootDir, value)
   }
 
-  const pluginRootMatch = value.match(/^\$\{(?:CLAUDE_PLUGIN_ROOT|CURSOR_PLUGIN_ROOT|PLUGIN_ROOT)\}[\\/](.+)$/)
+  const pluginRootMatch = value.match(/^\$\{(?:CLAUDE_PLUGIN_ROOT|CURSOR_PLUGIN_ROOT|CODEX_PLUGIN_ROOT|OPENCODE_PLUGIN_ROOT|PLUGIN_ROOT|PLUXX_PLUGIN_ROOT)\}[\\/](.+)$/)
   if (pluginRootMatch) {
     return resolve(rootDir, pluginRootMatch[1])
   }
@@ -957,8 +958,54 @@ function collectHookCommandStrings(value: unknown, commands: string[]): void {
 }
 
 function extractBundleCommandTargets(command: string): string[] {
-  const matches = command.match(/\$\{(?:CLAUDE_PLUGIN_ROOT|CURSOR_PLUGIN_ROOT|PLUGIN_ROOT)\}[\\/][^\s"'`;$|&<>]+|\.\.?[\\/][^\s"'`;$|&<>]+/g)
+  const matches = command.match(/\$\{(?:CLAUDE_PLUGIN_ROOT|CURSOR_PLUGIN_ROOT|CODEX_PLUGIN_ROOT|OPENCODE_PLUGIN_ROOT|PLUGIN_ROOT|PLUXX_PLUGIN_ROOT)\}[\\/][^\s"'`;$|&<>]+|\.\.?[\\/][^\s"'`;$|&<>]+/g)
   return matches ?? []
+}
+
+function extractRelativeBundleCommandTargets(command: string): string[] {
+  return extractBundleCommandTargets(command).filter(isRelativeBundlePath)
+}
+
+function commandChangesToKnownPluginRoot(command: string): boolean {
+  return /\bcd\s+["']?\$\{?(?:CLAUDE_PLUGIN_ROOT|CURSOR_PLUGIN_ROOT|CODEX_PLUGIN_ROOT|OPENCODE_PLUGIN_ROOT|PLUGIN_ROOT|PLUXX_PLUGIN_ROOT)\}?/.test(command)
+}
+
+function formatBundleRelativePath(rootDir: string, filePath: string): string {
+  const relativePath = relative(rootDir, filePath)
+  return relativePath && !relativePath.startsWith('..') ? relativePath : filePath
+}
+
+function findHookWrapperPaths(rootDir: string, command: string): string[] {
+  return extractBundleCommandTargets(command)
+    .map((target) => resolveBundleReference(rootDir, target))
+    .filter((target): target is string => {
+      if (!target) return false
+      return existsSync(target)
+        && basename(target).startsWith('pluxx-hook-command-')
+        && target.endsWith('.sh')
+    })
+}
+
+function findCodexCwdUnsafeHookCommands(rootDir: string, commands: string[]): string[] {
+  const issues = new Set<string>()
+
+  for (const command of commands) {
+    const relativeTargets = extractRelativeBundleCommandTargets(command)
+    if (relativeTargets.length > 0 && !commandChangesToKnownPluginRoot(command)) {
+      issues.add(`${command} uses cwd-relative bundle target(s): ${relativeTargets.join(', ')}`)
+    }
+
+    for (const wrapperPath of findHookWrapperPaths(rootDir, command)) {
+      const wrapper = readFileSync(wrapperPath, 'utf-8')
+      const hookCommand = wrapper.match(/^PLUXX_HOOK_COMMAND=(.*)$/m)?.[1] ?? ''
+      const wrapperRelativeTargets = extractRelativeBundleCommandTargets(hookCommand)
+      if (wrapperRelativeTargets.length > 0 && !commandChangesToKnownPluginRoot(wrapper)) {
+        issues.add(`${formatBundleRelativePath(rootDir, wrapperPath)} evaluates cwd-relative bundle target(s): ${wrapperRelativeTargets.join(', ')}`)
+      }
+    }
+  }
+
+  return [...issues].sort()
 }
 
 function resolveInstalledHooksReference(
@@ -1016,6 +1063,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
     return {
       missingManifestPaths: [],
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: [],
     }
   }
@@ -1026,6 +1074,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
       manifestIssue: `missing plugin manifest at ${manifestPath}`,
       missingManifestPaths: [],
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: [],
     }
   }
@@ -1038,6 +1087,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
       manifestIssue: `plugin manifest at ${manifestPath} is not parseable: ${error instanceof Error ? error.message : String(error)}`,
       missingManifestPaths: [],
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: [],
     }
   }
@@ -1056,6 +1106,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
       ...(manifestIssue ? { manifestIssue } : {}),
       missingManifestPaths,
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: findInstalledRuntimeScriptIssues(rootDir, manifest),
     }
   }
@@ -1065,6 +1116,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
       ...(manifestIssue ? { manifestIssue } : {}),
       missingManifestPaths,
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: findInstalledRuntimeScriptIssues(rootDir, manifest),
     }
   }
@@ -1082,11 +1134,15 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
           return resolved !== undefined && !existsSync(resolved)
         }),
     )].sort()
+    const cwdUnsafeHookCommands = platform === 'codex'
+      ? findCodexCwdUnsafeHookCommands(rootDir, commands)
+      : []
 
     return {
       ...(manifestIssue ? { manifestIssue } : {}),
       missingManifestPaths,
       missingHookTargets,
+      cwdUnsafeHookCommands,
       invalidRuntimeScripts: findInstalledRuntimeScriptIssues(rootDir, manifest),
     }
   } catch (error) {
@@ -1095,6 +1151,7 @@ export function findInstalledBundleIntegrityIssues(rootDir: string, platform: Ta
       hookConfigIssue: `hooks config at ${hooksReference} is not parseable: ${error instanceof Error ? error.message : String(error)}`,
       missingManifestPaths,
       missingHookTargets: [],
+      cwdUnsafeHookCommands: [],
       invalidRuntimeScripts: findInstalledRuntimeScriptIssues(rootDir, manifest),
     }
   }
@@ -1156,6 +1213,9 @@ function assertInstalledBundleIntegrity(rootDir: string, platform: TargetPlatfor
   }
   if (issues.missingHookTargets.length > 0) {
     details.push(`hook targets missing: ${issues.missingHookTargets.join(', ')}`)
+  }
+  if (issues.cwdUnsafeHookCommands.length > 0) {
+    details.push(`hook commands require plugin-root cwd: ${issues.cwdUnsafeHookCommands.join('; ')}`)
   }
   if (issues.invalidRuntimeScripts.length > 0) {
     details.push(`runtime script issues: ${issues.invalidRuntimeScripts.join(', ')}`)

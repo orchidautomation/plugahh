@@ -121,18 +121,18 @@ export function getRuntimeReadinessCapability(
           {
             gate: 'session-start',
             event: 'SessionStart',
-            command: 'node ./.codex/pluxx-readiness.mjs session-start',
+            command: `node "\${${pluginRootVar}}/.codex/pluxx-readiness.mjs" session-start`,
           },
           {
             gate: 'mcp-gate',
             event: 'PreToolUse',
             matcher: 'MCP',
-            command: 'node ./.codex/pluxx-readiness.mjs mcp-gate',
+            command: `node "\${${pluginRootVar}}/.codex/pluxx-readiness.mjs" mcp-gate`,
           },
           {
             gate: 'prompt-gate',
             event: 'UserPromptSubmit',
-            command: 'node ./.codex/pluxx-readiness.mjs prompt-gate',
+            command: `node "\${${pluginRootVar}}/.codex/pluxx-readiness.mjs" prompt-gate`,
           },
         ],
         notes: CODEX_EXTERNAL_NOTE,
